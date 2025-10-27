@@ -1,2 +1,2 @@
 # dotfiles
-My configuration for ArchLinux
+My configuration for ArchLinux Hyprland
