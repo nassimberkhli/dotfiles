@@ -10,3 +10,8 @@ ssh -vT git@github.com
 
 git config --global user.email "nassim.berkhli@outlook.com"
 git config --global user.name "nojo"
+
+sudo systemctl disable systemd-resolved
+sudo systemctl disable systemd-networkd
+sudo systemctl enable NetworkManager
+sudo systemctl start NetworkManager

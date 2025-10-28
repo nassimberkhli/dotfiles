@@ -1,9 +1,5 @@
 #!/bin/sh
 
-git clone https://aur.archlinux.org/yay-bin.git
-cd yay-bin
-makepkg -si
-
 sudo pacman -S pipewire\
 	pipewire-pulse\
 	pavucontrol\
@@ -25,4 +21,13 @@ sudo pacman -S pipewire\
 	ncdu\
 	bat\
 	eza\
-	yazi
+	ttf-nerd-fonts-symbols ttf-font-awesome\
+	network-manager-applet networkmanager\
+	discord\
+	ffmpeg
+
+git clone https://aur.archlinux.org/yay-bin.git
+cd yay-bin
+makepkg -si
+
+yay -S mpvpaper
