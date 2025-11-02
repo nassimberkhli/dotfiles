@@ -1,35 +1,17 @@
 #!/bin/sh
 
-sudo pacman -S pipewire\
-	pipewire-pulse\
-	pavucontrol\
-	neovim\
-	fish\
-	nvidia\
-	xdg-desktop-portal-hyprland\
-	network-manager-applet\
-	dunst\
-	grim slurp wl-clipboard\
-	git\
-	hyprpicker\
-	thunar\
-	nwg-look\
-	rofi\
-	tree\
-	btop\
-	ncdu\
-	bat\
-	eza\
-	ttf-nerd-fonts-symbols ttf-font-awesome\
-	network-manager-applet networkmanager\
-	discord\
-	ffmpeg\
-	hyprpaper qt6-5compat qt6-declarative qt6-svg qt6-virtualkeyboard qt6-multimedia-ffmpeg vlc\
-	hyprlock
+systemctl --user start wireplumber pipewire pipewire-pulse
+chsh -s /usr/bin/fish
 
-git clone https://aur.archlinux.org/yay-bin.git
-cd yay-bin
-makepkg -si
+cd ~
+cd .ssh
+ssh-keygen -a 100 -t ed25519
+ssh -vT git@github.com
 
-yay -S mpvpaper-git\
-	waybar\
+git config --global user.email "nassim.berkhli@outlook.com"
+git config --global user.name "nojo"
+
+sudo systemctl disable systemd-resolved
+sudo systemctl disable systemd-networkd
+sudo systemctl enable NetworkManager
+sudo systemctl start NetworkManager
