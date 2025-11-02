@@ -19,6 +19,8 @@ sudo cp "$SRC/51-disable-powersave-analog.lua" /etc/wireplumber/main.lua.d/51-di
 sudo cp "$SRC/51-disable-alsa-suspend.conf"   /etc/wireplumber/wireplumber.conf.d/51-disable-alsa-suspend.conf
 sudo cp "$SRC/51-disable-analog-suspend.conf" /etc/wireplumber/wireplumber.conf.d/51-disable-analog-suspend.conf
 
+sudo cp "$SRC/HOMOARAK.TTF" ~/.local/share/fonts/
+
 sudo cp "$SRC/sddm.conf" /etc/sddm.conf
 sudo cp -r "$SRC/sddm_spiderman" /usr/share/sddm/themes/sddm_spiderman
 sudo cp -r "$SRC/backgrounds" /usr/share/backgrounds
