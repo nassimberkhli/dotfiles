@@ -9,6 +9,8 @@
 /etc/wireplumber/wireplumber.conf.d/51-disable-alsa-suspend.conf
 /etc/wireplumber/wireplumber.conf.d/51-disable-analog-suspend.conf
 
-~/.ssh
-~/Wallpaper
+# /usr/share/backgrounds
+/etc/sddm.conf
+/usr/share/sddm/themes/where_is_my_sddm_theme
 
+~/.ssh

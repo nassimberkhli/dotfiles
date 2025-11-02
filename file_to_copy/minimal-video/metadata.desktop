@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Service
+Name=Minimal Video
+Comment=Minimal SDDM theme with video background
+
+[X-SDDM-Theme]
+Name=Minimal Video
+Type=sddm-theme
+Version=1.0
+MainScript=Main.qml
+Theme-Id=minimal-video
+
