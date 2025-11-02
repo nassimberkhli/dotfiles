@@ -1,0 +1,27 @@
+@import "colors.css";
+
+#pulseaudio-slider {
+  min-width: 100px;
+}
+
+#pulseaudio-slider highlight {
+  background-color: @first;
+  padding: 2px;
+  border-radius: 999px;
+  border-color: @first;
+}
+
+#pulseaudio-slider trough {
+  border-radius: 999px;
+  border: solid 2px @first;
+  background: transparent;
+  padding: 3px;
+}
+
+/* remove */
+#pulseaudio-slider slider {
+  opacity: 0;
+  border: none;
+  box-shadow: none;
+  background: none;
+}

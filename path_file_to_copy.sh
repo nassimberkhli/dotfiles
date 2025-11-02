@@ -11,6 +11,6 @@
 
 # /usr/share/backgrounds
 /etc/sddm.conf
-/usr/share/sddm/themes/where_is_my_sddm_theme
+/usr/share/sddm/themes/sddm_spiderman
 
 ~/.ssh
