@@ -1,16 +1,24 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
-~/.config/hypr
-~/.config/kitty
-~/.config/waybar
+SRC="file"
 
-/etc/environment
-/etc/wireplumber/main.lua.d/51-disable-powersave-analog.lua
-/etc/wireplumber/wireplumber.conf.d/51-disable-alsa-suspend.conf
-/etc/wireplumber/wireplumber.conf.d/51-disable-analog-suspend.conf
+mkdir -p ~/.config
 
-# /usr/share/backgrounds
-/etc/sddm.conf
-/usr/share/sddm/themes/sddm_spiderman
+rm -rf ~/.config/hypr ~/.config/kitty ~/.config/waybar
 
-~/.ssh
+cp -r "$SRC/hypr" ~/.config/
+cp -r "$SRC/kitty" ~/.config/
+cp -r "$SRC/waybar" ~/.config/
+
+sudo mkdir -p /etc/wireplumber/main.lua.d
+sudo mkdir -p /etc/wireplumber/wireplumber.conf.d
+sudo mkdir -p /usr/share/sddm/themes
+
+sudo cp "$SRC/environment" /etc/environment
+sudo cp "$SRC/51-disable-powersave-analog.lua" /etc/wireplumber/main.lua.d/51-disable-powersave-analog.lua
+sudo cp "$SRC/51-disable-alsa-suspend.conf"   /etc/wireplumber/wireplumber.conf.d/51-disable-alsa-suspend.conf
+sudo cp "$SRC/51-disable-analog-suspend.conf" /etc/wireplumber/wireplumber.conf.d/51-disable-analog-suspend.conf
+
+sudo cp "$SRC/sddm.conf" /etc/sddm.conf
+sudo cp -r "$SRC/sddm_spiderman" /usr/share/sddm/themes/sddm_spiderman
+sudo cp -r "$SRC/backgrounds" /usr/share/backgrounds
