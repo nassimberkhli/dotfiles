@@ -43,7 +43,9 @@ git config --global user.name "name"
 cd
 ```
 3 - copy your ~/.ssh/*.pub in your github account :
-  your profile  -> ssh key -> add ssh key
+```
+your profile -> ssh key -> add ssh key
+```
 4 - clone
 ```
 git clone git@github.com:nassimberkhli/dotfiles.git
