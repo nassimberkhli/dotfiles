@@ -42,7 +42,7 @@ git config --global user.email "your_mail"
 git config --global user.name "name"
 cd
 ```
-3 - copy your ~/.ssh/*.pub in your github account :
+3 - copy your ~/.ssh/yourFile.pub in your github account
 ```
 your profile -> ssh key -> add ssh key
 ```
