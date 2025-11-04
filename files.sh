@@ -8,6 +8,7 @@ FILES["kitty"]="$HOME/.config/kitty"
 FILES["waybar"]="$HOME/.config/waybar"
 FILES["fish"]="$HOME/.config/fish"
 FILES["nvim"]="$HOME/.config/nvim"
+FILES["cava"]="$HOME/.config/cava"
 
 # /etc
 FILES["environment"]="/etc/environment"

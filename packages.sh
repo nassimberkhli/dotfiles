@@ -33,7 +33,8 @@ sudo pacman -S --needed \
     hyprlock \
     nodejs npm \
     tlp tlp-rdw tp_smapi \
-    git curl unzip tar nodejs npm
+    git curl unzip tar nodejs npm \
+    cava
 
 # yay
 cd /tmp || exit 1
