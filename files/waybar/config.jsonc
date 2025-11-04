@@ -34,7 +34,7 @@
     "format": "",
     "tooltip": true,
     "tooltip-format": "Options d'alimentation",
-    "on-click": "~/.config/waybar/scripts/power_menu.sh",
+    "on-click": "kitty shutdown now",
     "interval": 0
   },
 
