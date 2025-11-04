@@ -1,13 +1,13 @@
 {
-  "width" : 1250,
+  "width" : 1900,
   "margin-top" : 5,
   "height" : 7,
   "tray": { "icon-size": 12, "spacing": 4 },
 
 
-  "modules-left": ["clock", "pulseaudio/slider"],
-  "modules-center": ["hyprland/workspaces"],
-  "modules-right": ["network", "battery", "custom/sys"],
+  "modules-left": ["clock", "battery"],
+  "modules-center": ["custom/sys", "hyprland/workspaces", "network"],
+  "modules-right": ["pulseaudio/slider", "custom/power"],
 
   "clock": {
     "interval": 5,
@@ -28,6 +28,14 @@
     "min": 0,
     "max": 100,
     "orientation": "horizontal"
+  },
+
+  "custom/power": {
+    "format": "",
+    "tooltip": true,
+    "tooltip-format": "Options d'alimentation",
+    "on-click": "~/.config/waybar/scripts/power_menu.sh",
+    "interval": 0
   },
 
   "hyprland/workspaces": {

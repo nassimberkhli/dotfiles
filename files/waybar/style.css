@@ -33,9 +33,19 @@ tooltip label {
 #network,
 #custom-sys,
 #battery {
+  color: @first;
+}
+
+#custom-power {
+  color: @third;
+}
+
+#network,
+#custom-sys,
+#custom-power,
+#battery {
   font-size: 17px;
   margin: 0 20px;
   background: transparent;
   border-radius:999px;
-  color: @first;
 }
