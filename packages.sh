@@ -32,7 +32,8 @@ sudo pacman -S --needed \
     vlc \
     hyprlock \
     nodejs npm \
-    tlp tlp-rdw tp_smapi
+    tlp tlp-rdw tp_smapi \
+    git curl unzip tar nodejs npm
 
 # yay
 cd /tmp || exit 1

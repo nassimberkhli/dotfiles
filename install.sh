@@ -1,6 +1,6 @@
 #!/bin/sh
 
-./install_command.sh
+./packages.sh
 
 ./update.sh --system
 
@@ -18,3 +18,5 @@ fish -c "set -U fish_greeting"
 systemctl enable tlp.service
 systemctl enable NetworkManager-dispatcher.service
 systemctl mask systemd-rfkill.service systemd-rfkill.socket
+
+chmod u+rwx ~/.config/nvim
