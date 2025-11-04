@@ -1,11 +1,7 @@
 # dotfiles
-
 My configuration for ArchLinux Hyprland
-
-<figure class="video_container">
-  <iframe src="dotfiles.mp4" frameborder="0" allowfullscreen="true"> 
-</iframe>
-</figure>
+<img width="1921" height="1080" alt="image" src="https://github.com/user-attachments/assets/4dea7790-e805-4bf7-a4ae-58752c40fe76" />
+<img width="1921" height="1080" alt="image" src="https://github.com/user-attachments/assets/9e03bf98-8131-4468-8535-38d1c5c7a32b" />
 
 ## 1 - Init archLinux with Hyprland
 
