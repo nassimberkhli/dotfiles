@@ -13,7 +13,7 @@ sudo systemctl disable systemd-networkd
 sudo systemctl enable NetworkManager
 sudo systemctl start NetworkManager
 
-set -U fish_greeting
+fish -c "set -U fish_greeting"
 
 systemctl enable tlp.service
 systemctl enable NetworkManager-dispatcher.service
