@@ -71,8 +71,6 @@
   },
   
   "battery": {
-    "bat": "BAT0",
-    "adapter": "ADP1",
     "interval": 5,
 
     "format": "{icon}",
@@ -83,10 +81,7 @@
     "format-plugged": "󰂄",
     "format-full": "󰁹",
 
-    // Ces tokens existent dans Waybar: {capacity}, {time}, {power}
     "tooltip-format": "{capacity}% | {time} | {power}",
     "tooltip": true,
-
-    "on-click": "kitty upower -i /org/freedesktop/UPower/devices/battery_BAT0"
   }
 }

@@ -5,4 +5,5 @@ if status is-interactive
 
     # Alias
     alias cpf "~/Desktop/scripts/copyFile.sh"
+    alias sp "~/Desktop/scripts/simplePush.sh"
 end
