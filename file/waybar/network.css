@@ -1,6 +1,0 @@
-@import "colors.css";
-
-#network.disconnected {
-  color: @third;
-}
-

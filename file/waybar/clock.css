@@ -1,9 +1,0 @@
-@import "colors.css";
-
-#clock {
-  padding: 0 10px 0 10px;
-  border-radius: 30px;
-  font-size: 15px;
-  font-family: "Homoarakhn", monospace;
-  color: @first;
-}
