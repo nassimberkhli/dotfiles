@@ -1,7 +1,7 @@
 #!/bin/sh
 # tlp-func-gpu - Intel GPU Functions
 #
-# Copyright (c) 2025 Thomas Koch <linrunner at gmx.net> and others.
+# Copyright (c) 2026 Thomas Koch <linrunner at gmx.net> and others.
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 # Needs: tlp-func-base
@@ -13,6 +13,7 @@ readonly BASE_MODD=/sys/module
 readonly BASE_DRMD=/sys/class/drm
 readonly BASE_DEBUGD=/sys/kernel/debug/dri
 
+# Intel i915 driver
 readonly IGPU_MIN_FREQ=gt_min_freq_mhz
 readonly IGPU_MAX_FREQ=gt_max_freq_mhz
 readonly IGPU_BOOST_FREQ=gt_boost_freq_mhz
@@ -21,43 +22,138 @@ readonly IGPU_RPN_FREQ=gt_RPn_freq_mhz
 # shellcheck disable=SC2034
 readonly IGPU_RP0_FREQ=gt_RP0_freq_mhz
 
+# Intel xe driver
+readonly IGPU_XE_MIN_FREQ=min_freq
+readonly IGPU_XE_MAX_FREQ=max_freq
+# shellcheck disable=SC2034
+readonly IGPU_XE_RPN_FREQ=rpn_freq
+# shellcheck disable=SC2034
+readonly IGPU_XE_RP0_FREQ=rp0_freq
+
 # ----------------------------------------------------------------------------
 # Functions
 
+get_gpu_driver_parms () {
+    # determine GPU driver and parameter locations
+    # $1: drm card dir
+    # retval: $_gpu_driver: kernel driver
+    #         $_gpu_freqs   frequency control dir (list) - Intel only
+    #         $_gpu_parm:   parameter sysdir - Intel only
+    #         $_gpu_dbg:    debug parameter sysdir - Intel only
+
+    local carddir="$1"
+    local gtfd
+
+    _gpu_driver="$(readlink "${carddir}/device/driver")"
+    _gpu_driver="${_gpu_driver##*/}"
+    _gpu_freqs=""
+    _gpu_parm=""
+    _gpu_dbg=""
+
+    case "$_gpu_driver" in
+        i915*) # Intel GPU
+            _gpu_freqs="$carddir"
+            _gpu_parm=${BASE_MODD}/${_gpu_driver}/parameters
+            _gpu_dbg=${BASE_DEBUGD}/${carddir##"${BASE_DRMD}/card"}
+            ;;
+
+        xe) # Intel GPU: new driver (Tiger Lake integrated graphics and newer, or discrete graphics card)
+            # iterate and concat all GT instances to cover multi-tile devices
+            # see: https://docs.kernel.org/gpu/xe/xe_tile.html
+            for gtfd in "$carddir"/device/tile*/gt*/freq*; do
+                [ -d "$gtfd" ] || break
+                _gpu_freqs="${_gpu_freqs}${_gpu_freqs:+ }$gtfd"
+            done
+            ;;
+    esac # driver
+    echo_debug "pm" "get_gpu_driver_parms: card=$carddir; driver=$_gpu_driver; freqs=$_gpu_freqs; parm=$_gpu_parm; dbg=$_gpu_dbg"
+
+    return 0
+}
+
 # --- Intel GPU
 
-get_intel_gpu_sysdirs () {
-    # determine Intel GPU sysdirs
-    # $1: drm sysdir, $2: driver
-    # retval: $_intel_gpu_parm: parameter sysdir;
-    #         $_intel_gpu_dbg:  debug sysdir
+set_intel_gpu_power_profile () {
+    # set gpu frequency limits
+    # $1: PP_PRF, PP_BAL, PP_SAV
+    # rc: 0=ok/1=parameter error
 
-    _intel_gpu_parm=${BASE_MODD}/$2/parameters
-    _intel_gpu_dbg=${BASE_DEBUGD}/${1##"${BASE_DRMD}/card"}
-    echo_debug "pm" "get_intel_gpu_sysdirs: gpu=$1 driver=$2; parm=$_intel_gpu_parm; dbg=$_intel_gpu_dbg"
+    local profile ec gtfd gtnum rc
+    local gdone=0 # 1=gpu present
+
+    case "$1" in
+        "$PP_PRF") profile="${INTEL_GPU_POWER_PROFILE_ON_AC:-}" ;;
+        "$PP_BAL") profile="${INTEL_GPU_POWER_PROFILE_ON_BAT:-}" ;;
+        "$PP_SAV") profile="${INTEL_GPU_POWER_PROFILE_ON_SAV:-$INTEL_GPU_POWER_PROFILE_ON_BAT}" ;;
+    esac
+
+    if [ -z "$profile" ]; then
+        echo_debug "pm" "set_intel_gpu_power_profile($1).not_configured"
+        return 0
+    fi
+
+    for gpu in "${BASE_DRMD}"/card?; do
+        [ -d "$gpu" ] || break
+        get_gpu_driver_parms "$gpu"
+
+        case "$_gpu_driver" in
+            xe) # Intel XE GPU
+                # iterate GT instances to cover multi-tile devices
+                gtnum=0
+                ec=0
+                for gtfd in $_gpu_freqs; do
+                    if [ -f "$gtfd/power_profile" ]; then
+                        gtnum=$((gtnum + 1))
+                        if ! write_sysf "$profile" "$gtfd/power_profile"; then
+                            echo_debug "pm" "set_intel_gpu_power_profile($1).write_error: gt=$gtfd profile=$profile; rc=$?"
+                            ec=$((ec + 1))
+                        fi
+                        gdone=1
+                    fi
+                done
+                echo_debug "pm" "set_intel_gpu_power_profile($1): gpu=$gpu profile=$profile; gtnum=$gtnum; ec=$ec"
+                ;;
+        esac
+    done # card
+
+    if [ $gdone -eq 0 ]; then
+        echo_debug "pm" "set_intel_gpu_power_profile($1).no_gpu"
+    fi
 
     return 0
 }
 
 set_intel_gpu_min_max_boost_freq () {
     # set gpu frequency limits
-    # $1: 0=ac mode, 1=battery mode
+    # $1: PP_PRF, PP_BAL, PP_SAV
     # rc: 0=ok/1=parameter error
+
     local new_min new_max new_boost
     local old_min old_max old_boost gpu_min gpu_max
-    local driver suffix
+    local gtfd gtnum suffix
 
-    if [ "$1" = "1" ]; then
-        new_min=${INTEL_GPU_MIN_FREQ_ON_BAT:-}
-        new_max=${INTEL_GPU_MAX_FREQ_ON_BAT:-}
-        new_boost=${INTEL_GPU_BOOST_FREQ_ON_BAT:-}
-        suffix="BAT"
-    else
-        new_min=${INTEL_GPU_MIN_FREQ_ON_AC:-}
-        new_max=${INTEL_GPU_MAX_FREQ_ON_AC:-}
-        new_boost=${INTEL_GPU_BOOST_FREQ_ON_AC:-}
-        suffix="AC"
-    fi
+    case "$1" in
+        "$PP_PRF")
+            new_min="${INTEL_GPU_MIN_FREQ_ON_AC:-}"
+            new_max="${INTEL_GPU_MAX_FREQ_ON_AC:-}"
+            new_boost="${INTEL_GPU_BOOST_FREQ_ON_AC:-}"
+            suffix="AC"
+            ;;
+
+        "$PP_BAL")
+            new_min="${INTEL_GPU_MIN_FREQ_ON_BAT:-}"
+            new_max="${INTEL_GPU_MAX_FREQ_ON_BAT:-}"
+            new_boost="${INTEL_GPU_BOOST_FREQ_ON_BAT:-}"
+            suffix="BAT"
+            ;;
+
+        "$PP_SAV")
+            new_min="${INTEL_GPU_MIN_FREQ_ON_SAV:-$INTEL_GPU_MIN_FREQ_ON_BAT}"
+            new_max="${INTEL_GPU_MAX_FREQ_ON_SAV:-$INTEL_GPU_MAX_FREQ_ON_BAT}"
+            new_boost="${INTEL_GPU_BOOST_FREQ_ON_SAV:-$INTEL_GPU_BOOST_FREQ_ON_BAT}"
+            suffix="SAV"
+            ;;
+    esac
 
     if [ -z "$new_min" ] && [ -z "$new_max" ] && [ -z "$new_boost" ]; then
         echo_debug "pm" "set_intel_gpu_min_max_boost_freq($1).not_configured"
@@ -65,18 +161,17 @@ set_intel_gpu_min_max_boost_freq () {
     fi
 
     for gpu in "${BASE_DRMD}"/card?; do
-        driver=$(readlink "${gpu}/device/driver")
-        driver=${driver##*/}
-        case "$driver" in
-            i915*) # Intel GPU found
-                get_intel_gpu_sysdirs "$gpu" "$driver"
+        [ -d "$gpu" ] || break
+        get_gpu_driver_parms "$gpu"
 
+        case "$_gpu_driver" in
+            i915*) # Intel GPU
                 # shellcheck disable=SC2034
-                if old_min=$(read_sysf "$gpu/$IGPU_MIN_FREQ") \
-                    && old_max=$(read_sysf "$gpu/$IGPU_MAX_FREQ") \
-                    && old_boost=$(read_sysf "$gpu/$IGPU_BOOST_FREQ") \
-                    && gpu_min=$(read_sysf "$gpu/$IGPU_RPN_FREQ") \
-                    && gpu_max=$(read_sysf "$gpu/$IGPU_RP0_FREQ"); then
+                if old_min=$(read_sysf "$_gpu_freqs/$IGPU_MIN_FREQ") \
+                    && old_max=$(read_sysf "$_gpu_freqs/$IGPU_MAX_FREQ") \
+                    && old_boost=$(read_sysf "$_gpu_freqs/$IGPU_BOOST_FREQ") \
+                    && gpu_min=$(read_sysf "$_gpu_freqs/$IGPU_RPN_FREQ") \
+                    && gpu_max=$(read_sysf "$_gpu_freqs/$IGPU_RP0_FREQ"); then
                     # frequencies actually readable, check new ones against hardware limits and boundary conditions
                     if ! is_uint "$new_min" 5 || [ "$new_min" -lt "$gpu_min" ] || [ "$new_min" -gt "$gpu_max" ]; then
                         echo_message "Error in configuration at INTEL_GPU_MIN_FREQ_ON_${suffix}=\"${new_min}\": frequency invalid or out of range (see 'tlp-stat -g')."
@@ -102,23 +197,68 @@ set_intel_gpu_min_max_boost_freq () {
 
                     # all parameters valid --> write min, max in proper sequence
                     if [ "$new_min" -gt "$old_max" ]; then
-                        write_sysf "$new_max" "$gpu/$IGPU_MAX_FREQ"
+                        write_sysf "$new_max" "$_gpu_freqs/$IGPU_MAX_FREQ"
                         echo_debug "pm" "set_intel_gpu_min_max_boost_freq($1).max: gpu=$gpu freq=$new_max; rc=$?"
-                        write_sysf "$new_min" "$gpu/$IGPU_MIN_FREQ"
+                        write_sysf "$new_min" "$_gpu_freqs/$IGPU_MIN_FREQ"
                         echo_debug "pm" "set_intel_gpu_min_max_boost_freq($1).min: gpu=$gpu freq=$new_min; rc=$?"
                     else
-                        write_sysf "$new_min" "$gpu/$IGPU_MIN_FREQ"
+                        write_sysf "$new_min" "$_gpu_freqs/$IGPU_MIN_FREQ"
                         echo_debug "pm" "set_intel_gpu_min_max_boost_freq($1).min: gpu=$gpu freq=$new_min; rc=$?"
-                        write_sysf "$new_max" "$gpu/$IGPU_MAX_FREQ"
+                        write_sysf "$new_max" "$_gpu_freqs/$IGPU_MAX_FREQ"
                         echo_debug "pm" "set_intel_gpu_min_max_boost_freq($1).max: gpu=$gpu freq=$new_max; rc=$?"
                     fi
-                    write_sysf "$new_boost" "$gpu/$IGPU_BOOST_FREQ"
+                    write_sysf "$new_boost" "$_gpu_freqs/$IGPU_BOOST_FREQ"
                     echo_debug "pm" "set_intel_gpu_min_max_boost_freq($1).boost: gpu=$gpu freq=$new_boost; rc=$?"
                 else
                     echo_debug "pm" "set_intel_gpu_min_max_boost_freq($1).not_available: gpu=$gpu"
                 fi
+                ;; # i915
+
+            xe)  # Intel XE GPU
+                # iterate GT instances to cover multi-tile devices
+                gtnum=0
+                for gtfd in $_gpu_freqs; do
+                    [ -d "$gtfd" ] || break
+                    gtnum=$((gtnum + 1))
+
+                    # shellcheck disable=SC2034
+                    if [ "$gtnum" -eq 1 ] \
+                        && old_min=$(read_sysf "$gtfd/$IGPU_XE_MIN_FREQ") \
+                        && old_max=$(read_sysf "$gtfd/$IGPU_XE_MAX_FREQ") \
+                        && gpu_min=$(read_sysf "$gtfd/$IGPU_XE_RPN_FREQ") \
+                        && gpu_max=$(read_sysf "$gtfd/$IGPU_XE_RP0_FREQ"); then
+                        # validate parameter on the first GT only
+                        if ! is_uint "$new_min" 5 || [ "$new_min" -lt "$gpu_min" ] || [ "$new_min" -gt "$gpu_max" ]; then
+                            echo_message "Error in configuration at INTEL_GPU_MIN_FREQ_ON_${suffix}=\"${new_min}\": frequency invalid or out of range (see 'tlp-stat -g')."
+                            echo_debug "pm" "set_intel_gpu_min_max_boost_freq($1).invalid: gpu=$gpu min=$new_min gpu_min=$gpu_min hw_max=$gpu_max; rc=1"
+                            return 1
+                        elif ! is_uint "$new_max" 5 || [ "$new_max" -lt "$gpu_min" ] || [ "$new_max" -gt "$gpu_max" ]; then
+                            echo_message "Error in configuration at INTEL_GPU_MAX_FREQ_ON_${suffix}=\"${new_max}\": frequency invalid or out of range (see 'tlp-stat -g')."
+                            echo_debug "pm" "set_intel_gpu_min_max_boost_freq($1).invalid: gpu=$gpu min=$new_min gpu_min=$gpu_min gpu_max=$gpu_max; rc=1"
+                            return 1
+                        elif [ "$new_min" -gt "$new_max" ]; then
+                            echo_message "Error in configuration: INTEL_GPU_MIN_FREQ_ON_${suffix} > INTEL_GPU_MAX_FREQ_ON_${suffix}."
+                            echo_debug "pm" "set_intel_gpu_min_max_boost_freq($1).min_gt_max: gpu=$gpu min=$new_min max=$new_max; rc=1"
+                            return 1
+                        fi
+                    fi # validate
+
+                    # all parameters valid --> write min, max in proper sequence (for all GTs)
+                    if [ "$new_min" -gt "$old_max" ]; then
+                        write_sysf "$new_max" "$gtfd/$IGPU_XE_MAX_FREQ"
+                        echo_debug "pm" "set_intel_gpu_min_max_boost_freq($1).max: gpu=$gpu freq=$new_max; rc=$?"
+                        write_sysf "$new_min" "$gtfd/$IGPU_XE_MIN_FREQ"
+                        echo_debug "pm" "set_intel_gpu_min_max_boost_freq($1).min: gpu=$gpu freq=$new_min; rc=$?"
+                    else
+                        write_sysf "$new_min" "$gtfd/$IGPU_XE_MIN_FREQ"
+                        echo_debug "pm" "set_intel_gpu_min_max_boost_freq($1).min: gpu=$gpu freq=$new_min; rc=$?"
+                        write_sysf "$new_max" "$gtfd/$IGPU_XE_MAX_FREQ"
+                        echo_debug "pm" "set_intel_gpu_min_max_boost_freq($1).max: gpu=$gpu freq=$new_max; rc=$?"
+                    fi
+                done
+                ;; # xe
         esac
-    done
+    done # card
 
     return 0
 }
@@ -127,23 +267,24 @@ set_intel_gpu_min_max_boost_freq () {
 
 set_amdgpu_profile () {
     # set amdgpu/radeon power profile
-    # $1: 0=ac mode, 1=battery mode
+    # $1: PP_PRF, PP_BAL, PP_SAV
 
-    local driver gpu level pwr rc1 rc2
+    local gpu level pwr rc1 rc2
     local sdone=0 # 1=gpu present
 
     for gpu in "${BASE_DRMD}"/card?; do
-        driver=$(readlink "${gpu}/device/driver")
-        driver=${driver##*/}
-        case "$driver" in
+        [ -d "$gpu" ] || break
+        get_gpu_driver_parms "$gpu"
+
+        case "$_gpu_driver" in
             amdgpu)
                 if [ -f "$gpu/device/power_dpm_force_performance_level" ]; then
                     # Use amdgpu dynamic power management method (DPM)
-                    if [ "$1" = "1" ]; then
-                        level=${RADEON_DPM_PERF_LEVEL_ON_BAT:-}
-                    else
-                        level=${RADEON_DPM_PERF_LEVEL_ON_AC:-}
-                    fi
+                    case "$1" in
+                        "$PP_PRF") level="${RADEON_DPM_PERF_LEVEL_ON_AC:-}" ;;
+                        "$PP_BAL") level="${RADEON_DPM_PERF_LEVEL_ON_BAT:-}" ;;
+                        "$PP_SAV") level="${RADEON_DPM_PERF_LEVEL_ON_SAV:-$RADEON_DPM_PERF_LEVEL_ON_BAT}" ;;
+                    esac
 
                     if [ -z "$level" ]; then
                         # do nothing if unconfigured
@@ -160,13 +301,22 @@ set_amdgpu_profile () {
             radeon)
                 if [ -f "$gpu/device/power_dpm_force_performance_level" ] && [ -f "$gpu/device/power_dpm_state" ]; then
                     # Use radeon dynamic power management method (DPM)
-                    if [ "$1" = "1" ]; then
-                        level=${RADEON_DPM_PERF_LEVEL_ON_BAT:-}
-                        pwr=${RADEON_DPM_STATE_ON_BAT:-}
-                    else
-                        level=${RADEON_DPM_PERF_LEVEL_ON_AC:-}
-                        pwr=${RADEON_DPM_STATE_ON_AC:-}
-                    fi
+                    case "$1" in
+                        "$PP_PRF")
+                            level="${RADEON_DPM_PERF_LEVEL_ON_AC:-}"
+                            pwr="${RADEON_DPM_STATE_ON_AC:-}"
+                            ;;
+
+                        "$PP_BAL")
+                            level="${RADEON_DPM_PERF_LEVEL_ON_BAT:-}"
+                            pwr="${RADEON_DPM_STATE_ON_BAT:-}"
+                            ;;
+
+                        "$PP_SAV")
+                            level="${RADEON_DPM_PERF_LEVEL_ON_SAV:-$RADEON_DPM_PERF_LEVEL_ON_BAT}"
+                            pwr="${RADEON_DPM_STATE_ON_SAV:-$RADEON_DPM_STATE_ON_BAT}"
+                            ;;
+                    esac
 
                     if [ -z "$pwr" ] || [ -z "$level" ]; then
                         # do nothing if (partially) unconfigured
@@ -176,25 +326,6 @@ set_amdgpu_profile () {
                         write_sysf "$level" "$gpu/device/power_dpm_force_performance_level"; rc1=$?
                         write_sysf "$pwr" "$gpu/device/power_dpm_state"; rc2=$?
                         echo_debug "pm" "set_amdgpu_profile($1).radeon: gpu=$gpu perf=${level}: rc=$rc1; state=${pwr}: rc=$rc2"
-                    fi
-                    sdone=1
-
-                elif [ -f "$gpu/device/power_method" ] && [ -f "$gpu/device/power_profile" ]; then
-                    # Use legacy radeon power profile method
-                    if [ "$1" = "1" ]; then
-                        pwr=${RADEON_POWER_PROFILE_ON_BAT:-}
-                    else
-                        pwr=${RADEON_POWER_PROFILE_ON_AC:-}
-                    fi
-
-                    if [ -z "$pwr" ]; then
-                        # do nothing if unconfigured
-                        echo_debug "pm" "set_amdgpu_profile($1).radeon_legacy.not_configured: gpu=$gpu"
-                        return 0
-                    else
-                        write_sysf "profile" "$gpu/device/power_method"; rc1=$?
-                        write_sysf "$pwr" "$gpu/power_profile"; rc2=$?
-                        echo_debug "pm" "set_amdgpu_profile($1).radeon_legacy: gpu=$gpu method=profile: rc=$rc1; profile=${pwr}: rc=$rc2"
                     fi
                     sdone=1
                 fi
@@ -211,25 +342,25 @@ set_amdgpu_profile () {
 
 set_abm_level () {
     # set amdgpu adaptive backlight modulation (ABM)
-    # $1: 0=ac mode, 1=battery mode
+    # $1: PP_PRF, PP_BAL, PP_SAV
 
-    local card driver gpu level old_level pps rc
+    local card gpu level old_level pps rc
     local sdone=0 # 1=gpu present
 
     for gpu in "${BASE_DRMD}"/card?; do
-        driver=$(readlink "${gpu}/device/driver")
-        driver=${driver##*/}
-        case "$driver" in
+        [ -d "$gpu" ] || break
+        get_gpu_driver_parms "$gpu"
+
+        case "$_gpu_driver" in
             amdgpu)
                 card="${gpu##/*/}"
                 for pps in "$gpu/${card}-eDP"*; do
                     if [ -f "$pps/amdgpu/panel_power_savings" ]; then
-                        if [ "$1" = "1" ]; then
-                            level=${AMDGPU_ABM_LEVEL_ON_BAT:-}
-                        else
-                            level=${AMDGPU_ABM_LEVEL_ON_AC:-}
-                        fi
-
+                        case "$1" in
+                            "$PP_PRF") level="${AMDGPU_ABM_LEVEL_ON_AC:-}" ;;
+                            "$PP_BAL") level="${AMDGPU_ABM_LEVEL_ON_BAT:-}" ;;
+                            "$PP_SAV") level="${AMDGPU_ABM_LEVEL_ON_SAV:-$AMDGPU_ABM_LEVEL_ON_BAT}" ;;
+                        esac
                         if [ -z "$level" ]; then
                             # do nothing if unconfigured
                             echo_debug "pm" "set_abm_level($1).amdgpu.not_configured: gpu=$gpu"
@@ -240,7 +371,7 @@ set_abm_level () {
                             # level does not change -> do not apply to prevent screen flicker
                             echo_debug "pm" "set_abm_level($1).amdgpu.no_change: pps=$pps level=${level} old_level=${old_level}"
                             return 0
-                        elif check_ppd_active ; then
+                        elif check_ppd_running ; then
                             # don't apply ABM when power-profiles-daemon is running
                             echo_message "Warning: AMDGPU_ABM_LEVEL_ON_AC/BAT is not set because power-profiles-daemon is running."
                             echo_debug "pm" "set_abm_level($1).amdgpu.nop_ppd_active"

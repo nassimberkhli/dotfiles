@@ -1,0 +1,111 @@
+/* ──────────────────────────────────────────────────────────────
+   Thème 8-bit minimaliste — fond noir, coins carrés (pixel)
+   Couleurs définies dans colors.rasi (pilotées par color.sh)
+   ────────────────────────────────────────────────────────────── */
+@import "colors.rasi"
+
+* {
+    font:             "monospace 13";
+    background-color: transparent;
+    text-color:       @fg;
+    margin:           0;
+    padding:          0;
+    spacing:          0;
+}
+
+window {
+    transparency:     "real";
+    background-color: @bg;
+    border:           3px;
+    border-color:     @accent;
+    border-radius:    0px;
+    width:            620px;
+    padding:          0px;
+}
+
+mainbox {
+    padding:          0px;
+    children:         [ inputbar, message, listview ];
+}
+
+/* ── Barre de recherche ── */
+inputbar {
+    background-color: @bg-alt;
+    text-color:       @accent2;
+    padding:          12px 14px;
+    spacing:          10px;
+    border:           0px 0px 3px 0px;
+    border-color:     @accent;
+    children:         [ prompt, entry ];
+}
+
+prompt {
+    text-color:       @accent2;
+}
+
+entry {
+    text-color:       @fg;
+    placeholder:      "search_";
+    placeholder-color: #555555;
+    cursor:           text;
+}
+
+/* ── Liste ── */
+listview {
+    lines:            8;
+    columns:          1;
+    fixed-height:     false;
+    cycle:            true;
+    scrollbar:        false;
+    padding:          6px 0px;
+}
+
+element {
+    padding:          8px 16px;
+    spacing:          12px;
+    border:           0px;
+    border-radius:    0px;
+    background-color: transparent;
+    text-color:       @fg;
+}
+
+element normal.normal   { text-color: @fg; }
+element alternate.normal { text-color: @fg; }
+
+element selected.normal {
+    background-color: @accent;
+    text-color:       @bg;
+    border:           0px 0px 0px 4px;
+    border-color:     @accent2;
+}
+
+element urgent.normal {
+    text-color:       @urgent;
+}
+
+element active.normal {
+    text-color:       @accent2;
+}
+
+element-text {
+    background-color: transparent;
+    text-color:       inherit;
+    vertical-align:   0.5;
+}
+
+element-icon {
+    size:             0px;
+}
+
+/* ── Message (ex: prompt de confirmation) ── */
+message {
+    padding:          0px;
+}
+
+textbox {
+    background-color: @bg-alt;
+    text-color:       @warn;
+    padding:          10px 14px;
+    border:           0px 0px 3px 0px;
+    border-color:     @accent;
+}

@@ -1,0 +1,17 @@
+antigravity
+antigravity-bin
+bridge-utils
+dynamips
+envycontrol
+gns3-gui
+gns3-server
+mpvpaper-git
+obscura-browser
+schemaspy
+snapd
+stockfish
+swaylock-plugin
+ubridge
+visual-studio-code-bin
+yay
+yay-debug

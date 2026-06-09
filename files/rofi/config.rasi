@@ -1,0 +1,15 @@
+/* Configuration rofi — comportement.
+   Le rendu visuel est dans theme.rasi / colors.rasi */
+configuration {
+    modi:                "drun,run,window";
+    show-icons:          false;
+    drun-display-format: "{name}";
+    display-drun:        ">";
+    display-run:         "$";
+    display-window:      "#";
+    sidebar-mode:        false;
+    case-sensitive:      false;
+    matching:            "fuzzy";
+}
+
+@theme "theme"

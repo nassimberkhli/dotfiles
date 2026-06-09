@@ -1,7 +1,7 @@
 #!/bin/sh
 # tlp-func-stat - tlp-stat Helper Functions
 #
-# Copyright (c) 2025 Thomas Koch <linrunner at gmx.net> and others.
+# Copyright (c) 2026 Thomas Koch <linrunner at gmx.net> and others.
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 # Needs: tlp-func-base, 15-tlp-func-disk, 35-tlp-func-batt
@@ -13,13 +13,12 @@ readonly INITCTL=initctl
 readonly SESTATUS=sestatus
 readonly SMARTCTL=smartctl
 
-readonly RE_AC_QUIRK='^UNDEFINED$'
 readonly RE_ATA_ERROR='ata[0-9]+: SError: {.*CommWake }'
 
 # ----------------------------------------------------------------------------
 # Functions
 
-# --- Checks
+# --- Service checks
 
 check_upstart () {
     # check if upstart is active init system (PID 1)
@@ -33,29 +32,54 @@ check_openrc () {
     [ -e /run/openrc/softlevel ]
 }
 
-check_ac_quirk () { # check for hardware known not to expose AC device
-                    # $1: model string; rc: 0=yes, 1=no
-    printf '%s' "$1" | grep -E -q "${RE_AC_QUIRK}"
+check_rdw_installed () {
+    # check if tlp-rdw is installed
+    cmd_exists "$TLPRDW"
+}
+
+check_tlp_pd_running () {
+    # check if power-profiles-daemon is running
+    # rc: 0=yes, 1=no
+    # shellcheck disable=SC2009
+    ps aux 2> /dev/null | grep -v "grep" | grep -q -E "/python.+$TLPPD"
+}
+
+check_ppd_service () {
+    # check if power-profiles-daemon.service is active
+    # rc: 0=yes, 1=no
+    check_service_state "$PPD_SERVICE" active
+}
+
+check_tuned_ppd_running () {
+    # check if power-profiles-daemon is running
+    # rc: 0=yes, 1=no
+    # shellcheck disable=SC2009
+    ps aux 2> /dev/null | grep -v "grep" | grep -q "$TUNED"
 }
 
 # --- Formatted Output
 
 printparm () {
     # formatted output of sysfile - general
-    # $1: format
+    # $1: printf format string
     # $2: sysfile
     # $3: n/a message, "_"=no output
-    # $4: cutoff
+    # $4: cutoff i.e. string to be removed from the end
+    # $5: 1=trim leading and trailing whitespace
     local format="$1"
     local sysf="$2"
     local namsg="$3"
     local cutoff="$4"
+    local trim="${5:-0}"
     local val=""
 
     if val=$(read_sysf "$sysf"); then
         # sysfile read successful
+        if [ "$trim" = "1" ]; then
+            val="$(trim "$val")"
+        fi
         if [ -n "$cutoff" ]; then
-            val=${val%"$cutoff"}
+            val="${val%"$cutoff"}"
         fi
     fi
 
@@ -64,21 +88,21 @@ printparm () {
         if [ -n "$namsg" ]; then
             if [ "$namsg" != "_" ]; then
                 # use specific n/a text
-                format=$(echo "$format" | sed -r -e "s/##(.*)##/($namsg)/" -e "s/\[.*\]//")
+                format="$(echo "$format" | sed -r -e "s/##(.*)##/($namsg)/" -e "s/\[.*\]//")"
             else
                 # _ = skip
                 sysf=""
             fi
         else
             # empty n/a text, use default text
-            format=$(echo "$format" | sed -r -e "s/##(.*)##/(not available)/" -e "s/\[.*\]//")
+            format="$(echo "$format" | sed -r -e "s/##(.*)##/(not available)/" -e "s/\[.*\]//")"
         fi
         # output n/a text or skip
         # shellcheck disable=SC2059
         [ -n "$sysf" ] && printf "$format\n" "$sysf"
     else
         # non empty value: strip delimiters from format str
-        format=$(echo "$format" | sed -r "s/##(.*)##/\1/")
+        format="$(echo "$format" | sed -r "s/##(.*)##/\1/")"
         # shellcheck disable=SC2059
         printf "$format\n" "$sysf" "$val"
     fi
@@ -187,32 +211,21 @@ print_file_modtime_and_age () {
     fi
 }
 
-print_saved_powerstate () {
-    # read and print saved state
-    local sps
+print_saved_profile () {
+    # read and print saved profile
 
-    sps="$(read_sysf "$PWRRUNFILE")"
-    case "$sps" in
-        0) printf "AC" ;;
-        1) printf "battery" ;;
-        *) printf "unknown" ;;
-    esac
-
-    # check for manual mode
-    get_manual_mode
+    read_saved_power_profile
     # shellcheck disable=SC2154
-    case "$_manual_mode" in
-        0|1|a) printf " (manual)\n" ;;
+    printf "%s" "$(pp2strx "$_pp_last")"
 
-        n) # check for persistent mode
-            # shellcheck disable=SC2154
-            if get_persist_mode && [ "$_persist_mode" = "$sps" ]; then
-                printf " (persistent)\n"
-            else
-                printf "\n"
-            fi
-            ;;
-    esac
+    # shellcheck disable=SC2154
+    if get_manual_mode > /dev/null; then
+        printf " (manual)\n"
+    elif [ "$_pp_def_mem" = "$_pp_last" ]; then
+        printf " (default)\n"
+    else
+        printf "\n"
+    fi
 
     return 0
 }
@@ -357,23 +370,32 @@ print_nvme_temp () {
     return 0
 }
 
-anonymize_disk_id () {
+anonymize_disk_ids () {
     # replace disk serial number with asterisks
-    # $1: disk id
-    if [ "$1" = "${1%_*}" ]; then
-        printf "%s" "$1"
-    else
-        echo "$1" | \
-            awk '{
-                s = $1
+    # $*: space separated list of disk ids
+
+    while [ $# -gt 0 ]; do
+        echo "$1" | awk '{
+            s = $1
+            if (s ~ /_/) {
                 i = length(s)
                 while (substr(s, i, 1) != "_" && i > 0) {
                     s = substr(s, 1, i-1) "*" substr(s, i+1)
                     i--
                 }
-                print s
-            }'
-    fi
+            } else if (s ~ /^nvme-nvme\./) {
+                for (i = 1; i <= length(s); i++) {
+                    if (i > 24 && substr(s, i, 1) != "-") {
+                        s = substr(s, 1, i-1) "*" substr(s, i+1)
+                    }
+                }
+            }
+            printf("%s", s)
+        }'
+
+        shift
+        [ $# -gt 0 ] && printf " "
+    done
 }
 
 show_disk_data () {
@@ -394,7 +416,7 @@ show_disk_data () {
         nvme) # NVMe disk
             printf     "\n%s:\n" "/dev/$_disk_dev"
             printf     "  Type       = NVMe\n"
-            [ -n "$_disk_id" ] && printf "  Disk ID    = %s\n" "$(anonymize_disk_id "$_disk_id")"
+            [ -n "$_disk_id" ] && printf "  Disk ID    = %s\n" "$(anonymize_disk_ids "$_disk_id")"
             print_sysf "  Model      = %s\n" "/sys/block/$_disk_dev/device/model"
             print_sysf "  Firmware   = %s\n" "/sys/block/$_disk_dev/device/firmware_rev"
             print_nvme_temp "$_disk_dev"
@@ -404,7 +426,7 @@ show_disk_data () {
             # ATA/USB/IEEE1394 disk
             printf     "\n%s:\n" "/dev/$_disk_dev"
             printf     "  Type       = %s\n" "$(toupper "$_disk_type")"
-            [ -n "$_disk_id" ] && printf "  Disk ID    = %s\n" "$(anonymize_disk_id "$_disk_id")"
+            [ -n "$_disk_id" ] && printf "  Disk ID    = %s\n" "$(anonymize_disk_ids "$_disk_id")"
 
             # save spindle state
             get_disk_state "$_disk_dev"
@@ -573,93 +595,157 @@ printparm_ahci () {
 # --- Graphics
 
 printparm_i915 () {
-    # formatted output of sysfile - i915 kernel module variant
-    # $*: sysfile alternatives
-    local sysf val
+    # formatted output of i915 parameters interpreting special values
+    # $1: sysfile
 
-    for sysf in "$@"; do
-        if val=$(read_sysf "$sysf"); then
-            # sysfile exists and is actually readable, output content
-            printf "%-44s = %2d " "$sysf" "$val"
-            # explain content
-            if [ "$val" = "-1" ]; then
-                printf "(use per-chip default)\n"
+    local sysf="$1" val
+
+    if val=$(read_sysf "$sysf"); then
+        # sysfile exists and is actually readable, output content
+        printf "%-44s = %2d " "$sysf" "$val"
+        # explain content
+        if [ "$val" = "-1" ]; then
+            printf "(use per-chip default)\n"
+        else
+            printf "("
+            if [ "${sysf##/*/}" = "enable_psr" ]; then
+                # enable_psr
+                case $val in
+                    0) printf "disabled" ;;
+                    1) printf "enabled" ;;
+                    2) printf "force link-standby mode" ;;
+                    3) printf "force link-off mode" ;;
+                    *) printf "unknown" ;;
+                esac
             else
-                printf "("
-                if [ "${sysf##/*/}" = "enable_psr" ]; then
-                    # enable_psr
-                    case $val in
-                        0) printf "disabled" ;;
-                        1) printf "enabled" ;;
-                        2) printf "force link-standby mode" ;;
-                        3) printf "force link-off mode" ;;
-                        *) printf "unknown" ;;
-                    esac
+                # other parms
+                if [ $((val & 1)) -ne 0 ]; then
+                    printf "enabled"
                 else
-                    # other parms
-                    if [ $((val & 1)) -ne 0 ]; then
-                        printf "enabled"
-                    else
-                        printf "disabled"
-                    fi
-                    [ $((val & 2)) -ne 0 ] && printf " + deep"
-                    [ $((val & 4)) -ne 0 ] && printf " + deepest"
+                    printf "disabled"
                 fi
-                printf ")\n"
             fi
-            # print first match only
-            break
+            printf ")\n"
         fi
-    done
+    else
+        printf "%-44s = (not available)\n" "$sysf"
+    fi
 
     return 0
 }
 
+printparm_amdgpu_ml () {
+    # output multiline clock readout from sysfile $1 as columns
+    # $1: sysfile
+    # rc: 0=file exists/1=file non-existent
+
+    local sysf="$1"
+    local out=""
+    local line
+    local rc=0
+
+    if [ ! -f "$sysf" ]; then
+        # sysfile nonexistent
+        out="(not available)"
+        rc=1
+    else
+        # parse sysfile line by line
+        # shellcheck disable=SC2162
+        while read -r line; do
+            if [ -n "$line" ]; then
+                line=$(printf "%-13s" "$line")
+                out="${out}${out:+ }${line}"
+            fi
+        done < "$sysf"
+    fi
+    if [ -n "$out" ]; then
+        printf "%-43s = %s\n" "$sysf" "$out"
+    fi
+
+    return $rc
+}
+
 show_gpu_data () {
     # show GPU data for all drivers
-    local card driver gpu lc pps sysout
+    # $1: 1=verbose (default: 0)
+    local verbose="${1:-0}"
+    local card clk gpu gtnum lc odir sysout
     local hdr=
 
     for gpu in "${BASE_DRMD}"/card?; do
         [ -d "$gpu" ] || continue
+        get_gpu_driver_parms "$gpu"
 
-        driver=$(readlink "${gpu}/device/driver")
-        driver=${driver##*/}
-        case "$driver" in
+        # shellcheck disable=SC2154
+        case "$_gpu_driver" in
             i915*) # Intel GPU
-                get_intel_gpu_sysdirs "$gpu" "$driver"
-
                 # power management data
                 if [ "$hdr" != "i915" ]; then
                     printf "+++ Intel Graphics\n"
                     hdr="i915"
                 fi
-                printf "%-44s = %s\n\n" "$gpu/device/driver" "$driver"
+                printf "%-44s = %s\n" "$gpu/device/driver" "$_gpu_driver"
 
                 # shellcheck disable=SC2154
-                printparm_i915 "$gpu/power/rc6_enable" "$_intel_gpu_parm/enable_rc6" "$_intel_gpu_parm/i915_enable_rc6"
+                printparm_i915 "$gpu/power/rc6_enable"
                 # shellcheck disable=SC2154
-                if sysout=$(grep '^FBC ' "$_intel_gpu_dbg/i915_fbc_status" 2> /dev/null); then
-                    printf "%-44s = %s\n" "$_intel_gpu_dbg/i915_fbc_status" "$sysout"
+                if sysout=$(grep '^FBC ' "$_gpu_dbg/i915_fbc_status" 2> /dev/null); then
+                    printf "%-44s = %s\n" "$_gpu_dbg/i915_fbc_status" "$sysout"
                 else
-                    printparm_i915 "$_intel_gpu_parm/enable_fbc" "$_intel_gpu_parm/i915_enable_fbc"
+                    printparm_i915 "$_gpu_parm/enable_fbc"
                 fi
-                if sysout=$(grep '^PSR mode:' "$_intel_gpu_dbg/i915_edp_psr_status" 2> /dev/null); then
-                    printf "%-44s = %s\n" "$_intel_gpu_dbg/i915_edp_psr_status" "$sysout"
+                if sysout=$(grep '^PSR mode:' "$_gpu_dbg/i915_edp_psr_status" 2> /dev/null); then
+                    printf "%-44s = %s\n" "$_gpu_dbg/i915_edp_psr_status" "$sysout"
                 else
-                    printparm_i915 "$_intel_gpu_parm/enable_psr"
+                    printparm_i915 "$_gpu_parm/enable_psr"
                 fi
                 printf "\n"
 
                 # frequency parameters
-                if readable_sysf "$gpu/$IGPU_MIN_FREQ"; then
-                    printparm "%-44s = ##%5d## [MHz]" "$gpu/$IGPU_MIN_FREQ"
-                    printparm "%-44s = ##%5d## [MHz]" "$gpu/$IGPU_MAX_FREQ"
-                    printparm "%-44s = ##%5d## [MHz]" "$gpu/$IGPU_BOOST_FREQ"
-                    printparm "%-44s = ##%5d## [MHz] (GPU min)" "$gpu/$IGPU_RPN_FREQ"
-                    printparm "%-44s = ##%5d## [MHz] (GPU max)" "$gpu/$IGPU_RP0_FREQ"
+                if readable_sysf "$_gpu_freqs//$IGPU_MIN_FREQ"; then
+                    printparm "%-44s = ##%5d## [MHz]" "$_gpu_freqs/$IGPU_MIN_FREQ"
+                    printparm "%-44s = ##%5d## [MHz]" "$_gpu_freqs/$IGPU_MAX_FREQ"
+                    printparm "%-44s = ##%5d## [MHz]" "$_gpu_freqs/$IGPU_BOOST_FREQ"
+                    printparm "%-44s = ##%5d## [MHz] (GPU min)" "$_gpu_freqs/$IGPU_RPN_FREQ"
+                    printparm "%-44s = ##%5d## [MHz] (GPU max)" "$_gpu_freqs/$IGPU_RP0_FREQ"
                     printf "\n"
                 fi
+                ;;
+
+            xe) # Intel GPU: new driver (Tiger Lake integrated graphics and newer, or discrete graphics card)
+                if [ "$hdr" != "xe" ]; then
+                    printf "+++ Intel Graphics\n"
+                    hdr="xe"
+                fi
+                printf "%-60s = %s\n" "$gpu/device/driver" "$_gpu_driver"
+                printparm "%-60s = ##%s##" "$gpu/device/power_state"
+
+                # iterate GT instances to cover multi-tile devices
+                gtnum="$(echo "$_gpu_freqs" | wc -w)"
+                lc=0
+                for gtfd in $_gpu_freqs; do
+                    printparm "%-60s = ##%s##" "$gtfd/power_profile"
+                    printparm "%-60s = ##%6d## [MHz]" "$gtfd/$IGPU_XE_MIN_FREQ"
+                    printparm "%-60s = ##%6d## [MHz]" "$gtfd/$IGPU_XE_MAX_FREQ"
+                    if [ "$verbose" = "1" ]; then
+                        printparm "%-60s = ##%6d## [MHz]" "$gtfd/cur_freq"
+                        printparm "%-60s = ##%6d## [MHz]" "$gtfd/act_freq"
+                    fi
+                    printparm "%-60s = ##%6d## [MHz] (GPU min)" "$gtfd/$IGPU_XE_RPN_FREQ"
+                    printparm "%-60s = ##%6d## [MHz] (GPU efficient)" "$gtfd/rpe_freq"
+                    printparm "%-60s = ##%6d## [MHz] (GPU max)" "$gtfd/$IGPU_XE_RP0_FREQ"
+                    if [ "$verbose" = "1" ]; then
+                        printparm "%-60s = ##%6d##" "$gtfd/rpa_freq"
+                    fi
+                    lc=$((lc + 1))
+
+                    [ "$verbose" = "1" ] || break # print only first instance if non-verbose
+                done
+                if [ "$lc" -lt "$gtnum" ]; then
+                    printf "Remaining GTs omitted for clarity, use -v to show all.\n"
+                fi
+                [ "$lc" -gt 0 ] && printf "\n"
+
                 ;;
 
             amdgpu) # AMD GPU
@@ -667,7 +753,8 @@ show_gpu_data () {
                     printf "+++ AMD Radeon Graphics\n"
                     hdr="amdgpu"
                 fi
-                printf "%-65s = %s\n\n" "$gpu/device/driver" "$driver"
+                printf "%-65s = %s\n" "$gpu/device/driver" "$_gpu_driver"
+                printparm "%-65s = ##%s##" "$gpu/device/power_state"
 
                 lc=0
                 if [ -f "$gpu/device/power_dpm_force_performance_level" ]; then
@@ -675,21 +762,33 @@ show_gpu_data () {
                     lc=1
                 fi
                 card="${gpu##/*/}"
-                for pps in "$gpu/${card}-eDP"*; do
-                    printparm "%-65s = ##%s##" "$pps/amdgpu/panel_power_savings" "not available"
+                for odir in "$gpu/${card}-eDP"*; do
+                    printparm "%-65s = ##%s##" "$odir/amdgpu/panel_power_savings" "not available"
                     lc=1
                 done
                 if [ "$lc" -eq "1" ]; then
                     printf "\n"
                 fi
+
+                if [ "$verbose" = "1" ]; then
+                    lc=0
+                    printparm "%-43s = ##%s##" "$gpu/device/power_state" "not available"
+                    for clk in pp_dpm_dcefclk pp_dpm_fclk pp_dpm_mclk pp_dpm_pcie pp_dpm_sclk pp_dpm_socclk; do
+                        printparm_amdgpu_ml "$gpu/device/${clk}" && lc=1
+                    done
+                    if [ "$lc" -eq "1" ]; then
+                        printf "\n"
+                    fi
+                fi
                 ;;
 
-            radeon) # AMD GPU
+            radeon) # AMD GPU: legacy driver
                 if [ "$hdr" != "radeon" ]; then
                     printf "+++ AMD Radeon Graphics\n"
                     hdr="radeon"
                 fi
-                printf "%-65s = %s\n\n" "$gpu/device/driver" "$driver"
+                printf "%-65s = %s\n" "$gpu/device/driver" "$_gpu_driver"
+                printparm "%-65s = ##%s##" "$gpu/device/power_state"
 
                 if [ -f "$gpu/device/power_dpm_force_performance_level" ]; then
                     # AMD hardware
@@ -705,20 +804,23 @@ show_gpu_data () {
                 fi
                 ;;
 
-            nouveau|nvidia) # Nvidia GPU
-                if [ "$hdr" != "$driver" ]; then
+            nouveau|nvidia) # Nvidia GPU: open and proprietary driver
+                if [ "$hdr" != "$_gpu_driver" ]; then
                     printf "+++ Nvidia Graphics\n"
-                    hdr="$driver"
+                    hdr="$_gpu_driver"
                 fi
-                printf "%-44s = %s\n\n" "$gpu/device/driver" "$driver"
+                printf "%-44s = %s\n" "$gpu/device/driver" "$_gpu_driver"
+                printparm "%-44s = ##%s##" "$gpu/device/power_state"
+
                 ;;
 
-            *) # Other GPU
-                if [ "$hdr" != "$driver" ]; then
+            *) # Other GPU driver
+                if [ "$hdr" != "$_gpu_driver" ]; then
                     printf "+++ Other Graphics\n"
-                    hdr="$driver"
+                    hdr="$_gpu_driver"
                 fi
-                printf "%-44s = %s\n\n" "$gpu/device/driver" "$driver"
+                printf "%-44s = %s\n" "$gpu/device/driver" "$_gpu_driver"
+                printparm "%-44s = ##%s##" "$gpu/device/power_state"
                 ;;
         esac
     done
@@ -729,7 +831,7 @@ show_gpu_data () {
 
 # --- Battery
 
-print_methods_per_driver () {
+print_bat_methods_per_driver () {
     # show features provided by a Thinkpad battery plugin
     # $1: driver = natacpi, tpacpi, tpsmapi
     local bm m mlist=""
@@ -741,12 +843,11 @@ print_methods_per_driver () {
             case $bm in
                 _bm_read)   [ "$1" = "tpsmapi" ] && m="status" ;;
                 _bm_thresh) m="charge thresholds" ;;
-                _bm_dischg) m="recalibration" ;;
+                _bm_dischg) m="force-discharge" ;;
             esac
             if [ -n "$m" ]; then
                 # concat method to output
-                [ -n "$mlist" ] && mlist="${mlist}, "
-                mlist="${mlist}${m}"
+                mlist="${mlist}${mlist:+, }${m}"
             fi
         fi
     done
@@ -760,11 +861,30 @@ print_methods_per_driver () {
     return 0
 }
 
-print_batstate () {
+print_bat_make () {
+    # print battery manufacturer and mode name
+    # $1: verbose
+    # global param: $_bd_read
+    # prerequisite: batdrv_init(), batdrv_select_battery()
+
+    local verbose="${1:-0}"
+
+    # shellcheck disable=SC2154
+    printparm "%-59s = ##%s##" "$_bd_read/manufacturer"
+    printparm "%-59s = ##%s##" "$_bd_read/model_name"
+    if [ "$verbose" = "1" ]; then
+       printparm "%-59s = ##%s##" "$_bd_read/serial_number" "" "" 1
+    fi
+
+    return 0
+}
+
+print_bat_state () {
     # print battery charging state with
     # an explanation when a threshold inhibits charging
     # $1: sysfile
     # global params: $_bm_thresh, $_syspwr
+
     local sysf val
 
     # check if bat state sysfile exists
@@ -789,27 +909,215 @@ print_batstate () {
     return 0
 }
 
-print_battery_cycle_count () {
+print_bat_cycle_count () {
     # print battery cycle count, explain special case of 0
-    # $1: sysfile
-    # $2: cycle count
-    case "$2" in
-        0) printf "%-59s = %6d (or not supported)\n" "$1" "$2" ;;
+    # $1: cycle count sysfile
+
+    local cc
+
+    cc="$(read_sysf "$1")"
+    case "$cc" in
+        0) printf "%-59s = %6d (or not supported)\n" "$1" "$cc" ;;
         "")  printf "%-59s = (not supported)\n" "$1" ;;
-        *)   printf "%-59s = %6d\n" "$1" "$2" ;;
+        *)   printf "%-59s = %6d\n" "$1" "$cc" ;;
     esac
 
     return 0
 }
 
+print_bat_energy () {
+    # print and sum up battery energy or charge data
+    # global param: $_bd_read
+    # global vars/retvals:
+    #   $_bat_ed    - design capacity (mWh or mAh)
+    #   $_bat_ef    - last fully charged level (mWh or mAh)
+    #   $_bat_en    - current charge level (mWh or mAh)
+    #   $_bat_efsum - accumulated fully charged level
+    #   $_bat_ensum - accumulated current charge level
+    # prerequisite: batdrv_init(), batdrv_select_battery()
+
+    local ed ef en pn pwr volt
+
+    # initialize accumulation
+    _bat_efsum="${_bat_efsum:-0}"
+    _bat_ensum="${_bat_ensum:-0}"
+
+    # shellcheck disable=SC2154
+    if [ -f "$_bd_read/energy_full" ]; then
+        # battery exposes mW(h) Units
+        # store data for battery charge level / capacity calculation
+        _bat_ed="$(perl -e 'printf "%.0f", '"$(read_sysval "$_bd_read/energy_full_design")"' / 1000.0')"
+        _bat_ef="$(perl -e 'printf "%.0f", '"$(read_sysval "$_bd_read/energy_full")"' / 1000.0')"
+        _bat_en="$(perl -e 'printf "%.0f", '"$(read_sysval "$_bd_read/energy_now")"' / 1000.0')"
+        pwr="$(perl -e 'printf "%.0f", '"$(read_sysval "$_bd_read/power_now")"' / 1000.0')"
+
+        # accumulate data for total charge level calculation
+        _bat_efsum=$((_bat_efsum + _bat_ef))
+        _bat_ensum=$((_bat_ensum + _bat_en))
+
+        printf "%-59s = %6d [mWh]\n" "$_bd_read/energy_full_design" "$_bat_ed"
+        printf "%-59s = %6d [mWh]\n" "$_bd_read/energy_full" "$_bat_ef"
+        printf "%-59s = %6d [mWh]\n" "$_bd_read/energy_now" "$_bat_en"
+        printf "%-59s = %6d [mW]\n"  "$_bd_read/power_now" "$pwr"
+
+    elif [ -f "$_bd_read/charge_full" ]; then
+        # battery exposes mA(h) Units
+        # store data for battery charge level / capacity calculation
+        _bat_ed="$(perl -e 'printf "%.0f", '"$(read_sysval "$_bd_read/charge_full_design")"' / 1000.0')"
+        _bat_ef="$(perl -e 'printf "%.0f", '"$(read_sysval "$_bd_read/charge_full")"' / 1000.0')"
+        _bat_en="$(perl -e 'printf "%.0f", '"$(read_sysval "$_bd_read/charge_now")"' / 1000.0')"
+
+        # accumulate data for total charge level calculation
+        _bat_efsum=$((_bat_efsum + _bat_ef))
+        _bat_ensum=$((_bat_ensum + _bat_en))
+
+        pwr="$(perl -e 'printf "%.0f", '"$(read_sysval "$_bd_read/current_now")"' / 1000.0')"
+        volt="$(read_sysval "$_bd_read/voltage_now")"
+
+        if [ "$volt" -gt 0 ]; then
+            # voltage is valid -> display mA(h) and mW(h) units side by side
+            # convert mA(h) to mW(h) units
+            volt="$(perl -e 'printf "%.3f", '"$volt"' / 1000000.0')"
+            ed="$(perl -e 'printf "%.0f\n", '"$_bat_ed"' * '"$volt"'')"
+            ef="$(perl -e 'printf "%.0f\n", '"$_bat_ef"' * '"$volt"'')"
+            en="$(perl -e 'printf "%.0f\n", '"$_bat_en"' * '"$volt"'')"
+            pn="$(perl -e 'printf "%.0f\n", '"$pwr"' * '"$volt"'')"
+
+            printf "%-59s = %6d [mAh] (%6d mWh)\n" "$_bd_read/charge_full_design" "$_bat_ed" "$ed"
+            printf "%-59s = %6d [mAh] (%6d mWh)\n" "$_bd_read/charge_full" "$_bat_ef" "$ef"
+            printf "%-59s = %6d [mAh] (%6d mWh)\n" "$_bd_read/charge_now" "$_bat_en" "$en"
+            printf "%-59s = %6d [mA]  (%6d mW)\n"  "$_bd_read/current_now" "$pwr" "$pn"
+        else
+            # voltage is not available or invalid -> display mA(h) units only
+            printf "%-59s = %6d [mAh]\n" "$_bd_read/charge_full_design" "$_bat_ed"
+            printf "%-59s = %6d [mAh]\n" "$_bd_read/charge_full" "$_bat_ef"
+            printf "%-59s = %6d [mAh]\n" "$_bd_read/charge_now" "$_bat_en"
+            printf "%-59s = %6d [mA]\n"  "$_bd_read/current_now" "$pwr"
+        fi
+
+    else
+        _bat_ed=0
+        _bat_ef=0
+        _bat_en=0
+    fi
+
+    return 0
+}
+
+print_bat_level () {
+    # print battery charge level (SOC) and capacity in percent
+    # global params: $_bat_ed, $_bat_ef, $_bat_en
+
+    local lf=0
+
+    if [ "$_bat_ef" -ne 0 ]; then
+        perl -e 'printf ("%-59s = %6.1f [%%]\n", "Charge",   100.0 * '"$_bat_en"' / '"$_bat_ef"');'
+        lf=1
+    fi
+    if [ "$_bat_ed" -ne 0 ]; then
+        perl -e 'printf ("%-59s = %6.1f [%%]\n", "Capacity", 100.0 * '"$_bat_ef"' / '"$_bat_ed"');'
+        lf=1
+    fi
+    [ "$lf" -gt 0 ] && printf "\n"
+
+    return 0
+}
+
+print_bat_level_total () {
+    # print total charge level (SOC) in percent (accumulated over all batteries)
+    # global vars: $_bat_efsum, $_bat_ensum
+
+    if [ "$_bat_efsum" -ne 0 ]; then
+        # more than one battery detected --> show charge total
+        perl -e 'printf ("%-59s = %6.1f [%%]\n", "+++ Charge total",   100.0 * '"$_bat_ensum"' / '"$_bat_efsum"');'
+        printf "\n"
+    fi
+
+    return 0
+}
+
+print_bat_voltages () {
+    # print battery voltages
+    # $1: verbose
+    # global param: $_bd_read
+    # prerequisite: batdrv_init(), batdrv_select_battery()
+
+    local verbose="${1:-0}"
+
+    if [ "$verbose" = "1" ]; then
+        printparm "%-59s = ##%6s## [mV]" "$_bd_read/voltage_min_design" "" 000
+        printparm "%-59s = ##%6s## [mV]" "$_bd_read/voltage_now" "" 000
+        printf "\n"
+    fi
+
+    return 0
+}
+
+# --- Radio Devices
+
+print_nm_rfkill_states () {
+    # print radio devices states as seen by NetworkManager and rfkill
+
+    # shellcheck disable=SC2086
+    if cmd_exists $NMCLI; then
+        echo "NetworkManager details:"
+        $NMCLI radio
+        echo
+
+    fi
+    # shellcheck disable=SC2086
+    if cmd_exists $RFKILL; then
+        echo "rfkill details:"
+        $RFKILL
+        echo
+    fi
+
+    return 0
+}
+
+# -- Desktop Environment
+
+print_desktop_session () {
+    # print DE, version, wayland/x11
+
+    local session stype version
+
+    session="${XDG_SESSION_DESKTOP:-unknown}"
+    stype="$XDG_SESSION_TYPE"
+    case "$session" in
+        gnome) version="$(gnome-shell --version 2> /dev/null)" ;;
+        ubuntu) version="Ubuntu/$(gnome-shell --version 2> /dev/null)" ;;
+        plasma) version="$(plasmashell --version 2> /dev/null)" ;;
+        cinnamon) version="$(cinnamon --version 2> /dev/null)" ;;
+        lxqt) version="$(lxqt-session --version 2> /dev/null | grep "session")" ;;
+    esac
+
+    if [ "$session" = "unknown" ]; then
+        if [ "$stype" = "tty" ]; then
+            printf "Desktop session = none (tty)\n"
+        else
+            printf "Desktop session = unknown (%s)\n" "$stype"
+        fi
+        return 1
+    fi
+
+    [ -n "$version" ] && session="$version"
+    if [ -n "$stype" ]; then
+        printf "Desktop session = %s (%s)\n" "$session" "$stype"
+    else
+        printf "Desktop session = %s\n" "$session"
+    fi
+
+    return 0
+}
 # -- udev diagnostic
 
 check_udev_rule_ps () {
     # check if udev rule for power source changes draws
 
     if [  -n "$_psdev" ]; then
-        $UDEVADM -d test -a change "$_psdev" 2>&1 | grep -E '^Reading rules file: .*tlp.rules$'
-        if $UDEVADM test -a change "$_psdev" 2> /dev/null |  grep -E '(^run:|RUN{program} :) .*tlp auto'; then
+        $UDEVADM_TEST -a change "$_psdev" 2>&1 | grep -E '^Reading rules file: .*tlp.rules$'
+        if $UDEVADM_TEST -a change "$_psdev" 2> /dev/null |  grep -E '(^run:|RUN{program} :) .*tlp auto'; then
             printf "OK.\n\n"
         else
             cprintf "err" "Fatal Error: TLP's udev rule for power source changes (85-tlp.rules) is not active -- possible package bug.\n\n"
@@ -821,10 +1129,10 @@ check_udev_rule_usb () {
     # check if udev rule for connecting USB device draws
     local ud
 
-    ud="$(glob_dirs '/usb[1-9]' /sys/bus/usb/devices/ 2> /dev/null | head -1)"
+    ud="$(glob_dirs '/usb[1-9]' /sys/bus/usb/devices 2> /dev/null | head -1)"
     if [ -n "$ud" ]; then
-        $UDEVADM -d test -a add "$ud" 2>&1 | grep -E '^Reading rules file: .*tlp.rules$'
-        if $UDEVADM test -a add "$ud" 2> /dev/null |  grep -E '(^run:|RUN{program} :) .*tlp-usb-udev usb'; then
+        $UDEVADM_TEST -a add "$ud" 2>&1 | grep -E '^Reading rules file: .*tlp.rules$'
+        if $UDEVADM_TEST -a add "$ud" 2> /dev/null | grep -E '(^run:|RUN{program} :) .*tlp-usb-udev usb'; then
             printf "OK.\n\n"
         else
             cprintf "err" "Fatal Error: TLP's udev rule for connecting USB devices (85-tlp.rules) is not active -- possible package bug.\n\n"

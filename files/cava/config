@@ -233,8 +233,8 @@
 [color]
 [color]
 gradient = 1
-gradient_color_2 = '#EB0560'
-gradient_color_1 = '#4A03FC'
+gradient_color_2 = '#aaff00'
+gradient_color_1 = '#0000ff'
 
 [smoothing]
 

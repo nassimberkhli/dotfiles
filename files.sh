@@ -9,6 +9,9 @@ FILES["waybar"]="$HOME/.config/waybar"
 FILES["fish"]="$HOME/.config/fish"
 FILES["nvim"]="$HOME/.config/nvim"
 FILES["cava"]="$HOME/.config/cava"
+FILES["dunst"]="$HOME/.config/dunst"
+FILES["rofi"]="$HOME/.config/rofi"
+FILES["color.sh"]="$HOME/.config/color.sh"
 
 # /etc
 FILES["environment"]="/etc/environment"
@@ -16,10 +19,12 @@ FILES["51-disable-powersave-analog.lua"]="/etc/wireplumber/main.lua.d/51-disable
 FILES["51-disable-alsa-suspend.conf"]="/etc/wireplumber/wireplumber.conf.d/51-disable-alsa-suspend.conf"
 FILES["51-disable-analog-suspend.conf"]="/etc/wireplumber/wireplumber.conf.d/51-disable-analog-suspend.conf"
 FILES["sddm.conf"]="/etc/sddm.conf"
+FILES["sddm.conf.d"]="/etc/sddm.conf.d"
 
 # /usr/share
 FILES["HOMOARAK.TTF"]="/usr/share/fonts/HOMOARAK.TTF"
 FILES["sddm_spiderman"]="/usr/share/sddm/themes/sddm_spiderman"
+FILES["minimal-video"]="/usr/share/sddm/themes/minimal-video"
 FILES["backgrounds"]="/usr/share/backgrounds"
 FILES["tlp"]="/usr/share/tlp"
 

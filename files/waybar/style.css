@@ -20,10 +20,12 @@ button:hover {
 }
 
 tooltip {
-  background-color: rgba(235, 5, 96, 0.5);
+  background-color: @background;
   font-size: 15px;
   text-shadow: none;
-  border: none;
+  border: 2px solid @second;
+  border-radius: 0px;
+  padding: 8px 12px;
 }
 
 tooltip label {
@@ -37,7 +39,7 @@ tooltip label {
 }
 
 #custom-power {
-  color: @third;
+  color: @first;
 }
 
 #network,
@@ -46,6 +48,7 @@ tooltip label {
 #battery {
   font-size: 17px;
   margin: 0 20px;
+  padding: 0 11px;
   background: transparent;
-  border-radius:999px;
+  border-radius: 999px;
 }

@@ -1,57 +1,35 @@
 #!/bin/sh
-sudo pacman -S --needed \
-    pipewire \
-    pipewire-pulse \
-    pavucontrol \
-    neovim \
-    fish \
-    nvidia \
-    xdg-desktop-portal-hyprland \
-    networkmanager \
-    network-manager-applet \
-    dunst \
-    grim \
-    slurp \
-    wl-clipboard \
-    git \
-    hyprpicker \
-    thunar \
-    nwg-look \
-    rofi \
-    tree \
-    btop \
-    ncdu \
-    bat \
-    eza \
-    ttf-nerd-fonts-symbols \
-    ttf-font-awesome \
-    discord \
-    ffmpeg \
-    hyprpaper \
-    qt6-5compat qt6-declarative qt6-svg qt6-virtualkeyboard qt6-multimedia-ffmpeg \
-    vlc \
-    hyprlock \
-    nodejs npm \
-    tlp tlp-rdw tp_smapi \
-    git curl unzip tar nodejs npm \
-    cava
+# ──────────────────────────────────────────────────────────────────────
+#  packages.sh — AMORÇAGE uniquement.
+#
+#  La liste des paquets n'est PLUS ici : elle est dynamique, générée par
+#  `./update.sh --repos` dans files/pkglist-officiel.txt (pacman) et
+#  files/pkglist-aur.txt (AUR), puis installée par install.sh.
+#
+#  Ce script installe seulement ce que les listes ne peuvent PAS capturer :
+#    - de quoi construire des paquets AUR (base-devel, git)
+#    - yay (nécessaire AVANT d'installer depuis pkglist-aur.txt)
+#    - les curseurs Vimix (build git, ce n'est pas un paquet)
+# ──────────────────────────────────────────────────────────────────────
+set -e
 
-# yay
-cd /tmp || exit 1
-if [ ! -d yay-bin ]; then
+# Prérequis pour construire des paquets AUR
+sudo pacman -S --needed --noconfirm base-devel git
+
+# yay (helper AUR) — uniquement s'il n'est pas déjà là
+if ! command -v yay >/dev/null 2>&1; then
+    cd /tmp || exit 1
+    rm -rf yay-bin
     git clone https://aur.archlinux.org/yay-bin.git
+    cd yay-bin || exit 1
+    makepkg -si --noconfirm
 fi
-cd yay-bin || exit 1
-makepkg -si --noconfirm
 
-# AUR
-yay -S --noconfirm \
-    mpvpaper-git \
-    waybar
-
+# Curseurs Vimix (build git -> non capturé par pacman -Qqem)
+cd /tmp || exit 1
+rm -rf Vimix-cursors
 git clone https://github.com/vinceliuice/Vimix-cursors.git
-cd Vimix-cursors
+cd Vimix-cursors || exit 1
 sudo ./install.sh
-sudo ./build.sh
-cd ..
-rm -r Vimix-cursors
+cd /tmp || exit 1
+rm -rf Vimix-cursors

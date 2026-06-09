@@ -150,3 +150,15 @@ for rel in "${!FILES[@]}"; do
         fi
     fi
 done
+
+# --- Capture des paquets installés (uniquement en mode --repos) ---
+if [ "$MODE" = "repos" ] && have pacman; then
+    if [ "$DRY_RUN" -eq 1 ]; then
+        log "[dry-run] pacman -Qqen > '$SRC_ROOT/pkglist-officiel.txt'"
+        log "[dry-run] pacman -Qqem > '$SRC_ROOT/pkglist-aur.txt'"
+    else
+        pacman -Qqen >"$SRC_ROOT/pkglist-officiel.txt"
+        pacman -Qqem >"$SRC_ROOT/pkglist-aur.txt"
+        log "[ok] listes de paquets régénérées (pkglist-officiel.txt, pkglist-aur.txt)"
+    fi
+fi

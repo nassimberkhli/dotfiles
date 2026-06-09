@@ -1,0 +1,10 @@
+/* Palette pilotée par ~/.config/color.sh — ne pas éditer à la main */
+* {
+    bg:      #000000;
+    bg-alt:  #0a0a0a;
+    fg:      #ffffff;
+    accent:  #0000ff;
+    accent2: #00ffaa;
+    warn:    #aaff00;
+    urgent:  #ff2e88;
+}

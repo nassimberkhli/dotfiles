@@ -1,38 +1,48 @@
 return {
 	"nvim-lualine/lualine.nvim",
 	config = function()
-		local accent = "#4a03fc" -- Bleu-violet demandé
-		local text_color = "#FFFFFF" -- Texte blanc
-		local nord = require("lualine.themes.nord")
+		local p = require("core.palette")
+		local accent = p.accent -- #3DA5FF
+		local accent2 = p.accent2 -- #F6C299
+		local white = "#FFFFFF"
 
-		-- On copie le thème nord pour le modifier
-		local theme = vim.deepcopy(nord)
-
-		-- Fonction utilitaire : applique ton style à tous les modes
-		local function set_mode(tbl)
-			tbl.a = { fg = text_color, bg = accent, gui = "bold" } -- bloc mode
-			tbl.b = { fg = text_color, bg = accent } -- partie à côté (branche, etc.)
-			tbl.c = { fg = text_color, bg = accent } -- nom de fichier
-			return tbl
-		end
-
-		theme.normal = set_mode(theme.normal)
-		theme.insert = set_mode(theme.insert)
-		theme.visual = set_mode(theme.visual)
-		theme.replace = set_mode(theme.replace)
-		theme.command = set_mode(theme.command)
-
-		-- Mode inactif (fichiers non focus)
-		theme.inactive = {
-			a = { fg = "#CCCCCC", bg = "#2E3440", gui = "bold" },
-			b = { fg = "#CCCCCC", bg = "#2E3440" },
-			c = { fg = "#CCCCCC", bg = "#2E3440" },
+		local theme = {
+			normal = {
+				a = { fg = white, bg = accent, gui = "bold" },
+				b = { fg = white, bg = accent },
+				c = { fg = white, bg = accent2 },
+			},
+			insert = {
+				a = { fg = white, bg = accent, gui = "bold" },
+				b = { fg = white, bg = accent },
+				c = { fg = white, bg = accent2 },
+			},
+			visual = {
+				a = { fg = white, bg = accent, gui = "bold" },
+				b = { fg = white, bg = accent },
+				c = { fg = white, bg = accent2 },
+			},
+			replace = {
+				a = { fg = white, bg = accent, gui = "bold" },
+				b = { fg = white, bg = accent },
+				c = { fg = white, bg = accent2 },
+			},
+			command = {
+				a = { fg = white, bg = accent, gui = "bold" },
+				b = { fg = white, bg = accent },
+				c = { fg = white, bg = accent2 },
+			},
+			inactive = {
+				a = { fg = white, bg = accent2 },
+				b = { fg = white, bg = accent2 },
+				c = { fg = white, bg = accent2 },
+			},
 		}
 
 		require("lualine").setup({
 			options = {
+				theme = theme, -- ✅ important
 				icons_enabled = true,
-				theme = theme,
 				section_separators = { left = "", right = "" },
 				component_separators = { left = "", right = "" },
 				disabled_filetypes = { "alpha", "neo-tree" },
@@ -45,11 +55,14 @@ return {
 						fmt = function(str)
 							return " " .. str
 						end,
+						color = { fg = white, bg = accent, gui = "bold" },
 					},
 				},
-				lualine_b = { "branch" },
+				lualine_b = {
+					{ "branch", color = { fg = white, bg = accent } },
+				},
 				lualine_c = {
-					{ "filename", file_status = true, path = 0 },
+					{ "filename", file_status = true, path = 0, color = { fg = white, bg = accent2 } },
 				},
 				lualine_x = {
 					{
@@ -60,19 +73,29 @@ return {
 						colored = false,
 						update_in_insert = false,
 						always_visible = false,
+						color = { fg = white, bg = accent },
 					},
-					{ "diff", colored = false, symbols = { added = " ", modified = " ", removed = " " } },
-					"encoding",
-					"filetype",
+					{
+						"diff",
+						colored = false,
+						symbols = { added = " ", modified = " ", removed = " " },
+						color = { fg = white, bg = accent },
+					},
+					{ "encoding", color = { fg = white, bg = accent } },
+					{ "filetype", color = { fg = white, bg = accent } },
 				},
-				lualine_y = { "location" },
-				lualine_z = { "progress" },
+				lualine_y = {
+					{ "location", color = { fg = white, bg = accent } },
+				},
+				lualine_z = {
+					{ "progress", color = { fg = white, bg = accent } },
+				},
 			},
 			inactive_sections = {
 				lualine_a = {},
 				lualine_b = {},
-				lualine_c = { { "filename", path = 1 } },
-				lualine_x = { { "location", padding = 0 } },
+				lualine_c = { { "filename", path = 1, color = { fg = white, bg = accent2 } } },
+				lualine_x = { { "location", padding = 0, color = { fg = white, bg = accent } } },
 				lualine_y = {},
 				lualine_z = {},
 			},
@@ -80,7 +103,7 @@ return {
 			extensions = { "fugitive" },
 		})
 
-		-- 🔹 Couleur du surlignage visuel
-		vim.api.nvim_set_hl(0, "Visual", { bg = accent, fg = text_color })
+		-- Visuel (sélection)
+		vim.api.nvim_set_hl(0, "Visual", { bg = accent, fg = white })
 	end,
 }

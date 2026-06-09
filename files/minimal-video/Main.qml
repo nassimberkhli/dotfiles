@@ -6,14 +6,15 @@ import Sddm 1.1
 
 Item {
     width: 1920; height: 1080
-    property color fg: "#ffffff"
-    property color ac: "#7aa2f7"
+    // Couleurs lues depuis theme.conf (pilotées par ~/.config/color.sh), avec fallback
+    property color fg: config.foreground || "#ffffff"
+    property color ac: config.accent || "#7aa2f7"
     property int fs: 14
 
     // --- video background ---
     MediaPlayer {
         id: player
-        source: theme.background
+        source: config.background
         autoPlay: true
         loops: MediaPlayer.Infinite
         muted: true

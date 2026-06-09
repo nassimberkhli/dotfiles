@@ -43,29 +43,33 @@ vim.api.nvim_create_autocmd("TextYankPost", {
 	pattern = "*",
 })
 
--- Accent commun
-local accent = "#4a03fc"
+-- Palette (uniquement 2 couleurs)
+local p = require("core.palette")
+local accent = p.accent
+local accent2 = p.accent2
+local white = "#FFFFFF"
 
--- a) Sélection & recherche : feedback clair, mais pas partout
-vim.api.nvim_set_hl(0, "Visual", { bg = accent, fg = "#2E3440" }) -- sélection visuelle
-vim.api.nvim_set_hl(0, "IncSearch", { bg = accent, fg = "#2E3440", bold = true })
-vim.api.nvim_set_hl(0, "Search", { bg = accent, fg = "#2E3440" })
+-- a) Sélection & recherche
+-- vim.api.nvim_set_hl(0, "Visual", { bg = accent, fg = white })
+-- vim.api.nvim_set_hl(0, "VisualNOS", { bg = accent, fg = white })
 
--- b) Matching parenthesis : petit clin d’œil
+vim.api.nvim_set_hl(0, "IncSearch", { bg = accent, fg = accent2, bold = true })
+vim.api.nvim_set_hl(0, "Search", { bg = accent2, fg = accent })
+
+-- b) Matching parenthesis
 vim.api.nvim_set_hl(0, "MatchParen", { fg = accent, bold = true })
 
--- c) Curseur/ligne de statut flottante : bordures Telescope & fenêtres flottantes
+-- c) Bordures & Telescope
 vim.api.nvim_set_hl(0, "FloatBorder", { fg = accent })
 vim.api.nvim_set_hl(0, "TelescopeBorder", { fg = accent })
-vim.api.nvim_set_hl(0, "TelescopeSelection", { bg = accent, fg = "#2E3440", bold = true })
-vim.api.nvim_set_hl(0, "TelescopeMatching", { fg = accent, bold = true })
+vim.api.nvim_set_hl(0, "TelescopeSelection", { bg = accent, fg = accent2, bold = true })
+vim.api.nvim_set_hl(0, "TelescopeMatching", { fg = accent2, bold = true })
 
--- d) Neo-tree : expander / markers
+-- d) Neo-tree
 vim.api.nvim_set_hl(0, "NeoTreeExpander", { fg = accent })
-vim.api.nvim_set_hl(0, "NeoTreeIndentMarker", { fg = "#434C5E" }) -- garde discret; déjà custom dans ta config
--- Optionnel : nom de fichier sélectionné
+vim.api.nvim_set_hl(0, "NeoTreeIndentMarker", { fg = accent2 })
 vim.api.nvim_set_hl(0, "NeoTreeFileNameOpened", { fg = accent, bold = true })
 
--- e) Bufferline : souligner le buffer actif avec l’accent (léger)
+-- e) Bufferline
 vim.api.nvim_set_hl(0, "BufferLineIndicatorSelected", { fg = accent })
-vim.api.nvim_set_hl(0, "BufferLineBufferSelected", { fg = "#ECEFF4", bold = true })
+vim.api.nvim_set_hl(0, "BufferLineBufferSelected", { fg = accent2, bold = true })

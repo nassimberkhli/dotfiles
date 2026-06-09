@@ -1,11 +1,12 @@
 #!/usr/bin/perl
 # tlp-readconfs - read all of TLP's config files
 #
-# Copyright (c) 2025 Thomas Koch <linrunner at gmx.net> and others.
+# Copyright (c) 2026 Thomas Koch <linrunner at gmx.net> and others.
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 # Cmdline options
 #   --outfile <FILE>: filepath to contain merged configuration
+#   --skipdefs: skip intrinsic defaults from CONF_DEF
 #   --notrace: disable trace
 #   --cdiff: only show differences to the default
 #
@@ -22,42 +23,50 @@ use warnings;
 use File::Basename;
 use Getopt::Long;
 
-# --- Constants
-use constant CONF_USR => "/etc/tlp.conf";
-use constant CONF_DIR => "/etc/tlp.d";
-use constant CONF_DEF => "/usr/share/tlp/defaults.conf";
-use constant CONF_REN => "/usr/share/tlp/rename.conf";
-use constant CONF_DPR => "/usr/share/tlp/deprecated.conf";
-use constant CONF_OLD => "/etc/default/tlp";
+# --- Definitions
+# Path substitutions
+use constant CONF_USR => '/etc/tlp.conf';
+use constant CONF_DIR => '/etc/tlp.d';
+use constant CONF_DEF => '/usr/share/tlp/defaults.conf';
+use constant CONF_REN => '/usr/share/tlp/rename.conf';
+use constant CONF_DPR => '/usr/share/tlp/deprecated.conf';
 
 # Exit codes
 use constant EXIT_TLPCONF => 5;
 use constant EXIT_DEFCONF => 6;
 
+# Defaults spared by TLP_DISABLE_DEFAULTS=1
+use constant ESSENTIAL_DEFAULTS => qr/TLP_ENABLE|TLP_WARN_LEVEL|TLP_AUTO_SWITCH|TLP_PROFILE_AC|TLP_PROFILE_BAT/;
+
 # --- Global vars
-my @config_val = ();  # 2-dim array: parameter name, value, source, default-value
-my %config_idx = ();  # hash: parameter name => index into the name-value array
+my @config_val = ();      # 2-dim array: parameter name, value, source, default-value
+my %config_idx = ();      # hash: parameter name => index into the name-value array
 
-my %rename = ();      # hash: OLD_PARAMETER => NEW_PARAMETER
-my $renrex;           # compiled regex for renaming parameters
-my $do_rename = 0;    # enable renaming (when $renrex not empty)
-my %dprmsg = ();      # hash: PARAMETER => deprecated message
+my $skip_defaults = 0;    # skip all entries from CONF_DEF
 
-my $notrace = 0;
-my $debug   = 0;
-my $cdiff   = 0;
+my %rename = ();          # hash: OLD_PARAMETER => NEW_PARAMETER
+my $renrex;               # compiled regex for renaming parameters
+my $do_rename = 0;        # enable renaming (when $renrex not empty)
+my %dprmsg    = ();       # hash: PARAMETER => deprecated message
+
+my $notrace      = 0;
+my $trace2stderr = 0;
+my $debug        = 0;
+my $cdiff        = 0;
 
 my $outfile;
 
-my $defsrc = basename (CONF_DEF);
+my $defsrc = basename(CONF_DEF);
 
 # --- Subroutines
 
 # Format and write debug message
 # @_: printf arguments including format string
 sub printf_debug {
-    if ( ! $notrace && $debug ) {
-        open (my $logpipe, "|-", "logger -p debug -t \"tlp\" --id=\$\$ --") || return 1;
+    if ( $trace2stderr) {
+        printf STDERR @_;
+    } elsif ( ! $notrace && $debug ) {
+        open (my $logpipe, "|-", "logger -p daemon.debug -t \"tlp\" --id=\$\$ --") || return 1;
         printf {$logpipe} @_;
         close ($logpipe);
     }
@@ -73,39 +82,62 @@ sub printf_debug {
 # $_[4]: 0=user config/1=default
 # return: 0=new name/1=known name
 sub store_name_value_source {
-    my $name = $_[0];
-    my $value = $_[1];
+    my $name   = $_[0];
+    my $value  = $_[1];
     my $append = $_[2];
     my $source = $_[3];
     my $is_def = $_[4];
 
     $debug = 1 if ( $name eq "TLP_DEBUG" && $value =~ /\bcfg\b/ );
 
+    if ( $name eq "TLP_DISABLE_DEFAULTS" && $value eq "1" ) {
+        $skip_defaults = 1;
+        printf_debug ("tlp-readconfs.skip_defaults\n");
+    }
+
     if ( defined $config_idx{$name} ) {
         # existing name
-        if ( $append ) {
+        if ( $append
+            # do not append in default.conf (for good measure only)
+            and not $is_def
+            # do not append to stored default if TLP_DISABLE_DEFAULTS=1
+            and not ( $skip_defaults and $config_val[$config_idx{$name}][3] )
+        ) {
             # append value, source
             $config_val[$config_idx{$name}][1] .= " $value";
             $config_val[$config_idx{$name}][2] .= " & $source";
+            printf_debug ("tlp-readconfs.replace+ [%s]: %s=\"%s\" '%s' def='%s'\n",
+                $config_idx{$name},
+                $name,
+                $config_val[$config_idx{$name}][1],
+                $config_val[$config_idx{$name}][2],
+                $config_val[$config_idx{$name}][3]
+            );
         } else {
             # replace value, source
             $config_val[$config_idx{$name}][1] = $value;
             $config_val[$config_idx{$name}][2] = $source;
+            printf_debug ("tlp-readconfs.replace  [%s]: %s=\"%s\" '%s' def='%s'\n",
+                $config_idx{$name},
+                $name,
+                $value,
+                $source,
+                $config_val[$config_idx{$name}][3]
+            );
         }
-
-        printf_debug ("tlp-readconfs.replace [%s]: %s=\"%s\" %s\n", $config_idx{$name}, $name, $value, $source);
     } else {
         # new name --> store name, value, source and hash name
         if ( $is_def ) {
-            #save value as default
+            # save value as default
             push(@config_val, [$name, $value, $source, $value]);
+            printf_debug ("tlp-readconfs.ins-def  [%s]: %s=\"%s\" '%s' def='%s'\n", $#config_val, $name, $value, $source, $value);
         } else {
             # save value as user config
             push(@config_val, [$name, $value, $source, ""]);
+            printf_debug ("tlp-readconfs.insert   [%s]: %s=\"%s\" %s def='%s'\n", $#config_val, $name, $value, $source, "");
         }
         $config_idx{$name} = $#config_val;
 
-        printf_debug ("tlp-readconfs.insert  [%s]: %s=\"%s\" %s\n", $#config_val, $name, $value, $source);
     }
 
     return 0;
@@ -135,19 +167,18 @@ sub parse_configfile {
         # strip newline
         chomp $line;
         $ln += 1;
-        # strip comments: everything after '#' but not when '#' is quoted, i.e. followed by a closing quote ('"')
-        # note: opening quote is handled by the regex below
-        $line =~ s/#(?=[^"]*$).*$//;
+        # strip #-comments outside of quoted value
+        $line =~ s/(?:"[^"]*")(*SKIP)(*FAIL)|#.*$//;
         # strip trailing spaces
         $line =~ s/\s+$//;
-        # select lines with format 'PARAMETER=value' or 'PARAMETER="value"'
-        if ( $line =~ /^(?<name>[A-Z_]+[0-9]*)(?<op>(=|\+=))(?:(?<val_bare>[-0-9a-zA-Z _.:]*)|"(?<val_dquoted>[-0-9a-zA-Z _.:]*)")\s*$/ ) {
+        # select lines with format PARAMETER=value or PARAMETER="value"
+        if ( $line =~ /^(?<name>[A-Z_]+[0-9]*)(?<op>=|\+=)"?(?<value>[][0-9a-zA-Z _.:-]*)"?\s*$/ ) {
             my $name = $+{name};
             if ( $do_ren ) {
                 # rename PARAMETER
                 $name =~ s/$renrex/$rename{$1}/;
             }
-            my $value = $+{val_dquoted} // $+{val_bare};
+            my $value = $+{value};
             my $append = $+{op} eq "+=";
             store_name_value_source ($name, $value, $append, $source . " L" . sprintf ("%04d", $ln), $is_def );
         }
@@ -173,23 +204,32 @@ sub write_runconf {
 
     foreach ( @config_val ) {
         my ($name, $value, $source, $default) = @$_;
+
+        # skip default entries
+        next if ( $skip_defaults # if TLP_DISABLE_DEFAULTS=1
+            and $source =~ /^$defsrc/ # skip default-only or default-identical
+            and not ( $name =~ ESSENTIAL_DEFAULTS ) # do not skip essentials
+        );
+
         if ( $runconf eq *STDOUT ) {
             my $msg = "";
+
             # stdout: check for deprecated message
             if ( defined $dprmsg{$name} ) {
                 $msg = " #! $dprmsg{$name}";
             }
+
             # --cdiff: do not show user config lines matching the default
             if ( ! $cdiff || $value ne $default ) {
                 printf {$runconf} "%s: %s=\"%s\"%s\n", $source, $name, $value, $msg;
             }
-        } else  {
+        } else {
             printf {$runconf} "%s=\"%s\"\n", $name, $value;
         }
     }
     close ($runconf);
 
-    return 0
+    return 0;
 }
 
 # Parse parameter renaming rules from file
@@ -247,7 +287,13 @@ sub parse_dprfile {
 
 # --- MAIN
 # parse arguments
-GetOptions ('outfile=s' => \$outfile, 'notrace' => \$notrace, 'cdiff' => \$cdiff);
+GetOptions (
+    'outfile=s' => \$outfile,
+    'skipdefs' => \$skip_defaults,
+    'notrace' => \$notrace,
+    'trace2stderr' => \$trace2stderr,
+    'cdiff' => \$cdiff
+);
 
 # read parameter renaming rules
 parse_renfile (CONF_REN);
@@ -264,8 +310,7 @@ foreach my $conffile ( grep { -f } glob CONF_DIR . "/*.conf" ) {
 }
 
 # 3. read user settings (with renaming)
-parse_configfile (CONF_USR, $do_rename) == 0
-    || parse_configfile (CONF_OLD, $do_rename) == 0 || exit EXIT_TLPCONF;
+parse_configfile (CONF_USR, $do_rename) == 0 || exit EXIT_TLPCONF;
 
 # save result
 write_runconf ($outfile);
