@@ -103,6 +103,9 @@ sway
 swaylock
 swayosd
 synfigstudio
+texlive-basic
+texlive-bin
+texlive-latex
 thunar
 tlp
 tlp-rdw
