@@ -79,7 +79,7 @@
 [urgency_normal]
     background = "#000000"
     foreground = "#ffffff"
-    frame_color = "#0000ff"
+    frame_color = "#ffffff"
     timeout = 8
 
 [urgency_critical]

@@ -9,7 +9,7 @@
 # ----------------------------------------------------------------------------
 # Constants
 
-readonly TLPVER="1.10.0"
+readonly TLPVER="1.10.1"
 
 readonly RUNDIR=/run/tlp
 readonly VARDIR=/var/lib/tlp

@@ -10,6 +10,17 @@ configuration {
     sidebar-mode:        false;
     case-sensitive:      false;
     matching:            "fuzzy";
+
+    /* Ctrl+j / Ctrl+k pour descendre / monter dans la liste.
+       On libère d'abord ces touches de leurs actions par défaut. */
+    kb-accept-entry:     "Control+m,Return,KP_Enter";
+    kb-remove-to-eol:    "";
+    kb-row-down:         "Down,Control+n,Control+j";
+    kb-row-up:           "Up,Control+p,Control+k";
 }
 
 @theme "theme"
+
+element-text {
+    highlight: None;
+}

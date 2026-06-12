@@ -11,7 +11,15 @@ FILES["nvim"]="$HOME/.config/nvim"
 FILES["cava"]="$HOME/.config/cava"
 FILES["dunst"]="$HOME/.config/dunst"
 FILES["rofi"]="$HOME/.config/rofi"
+FILES["swayosd"]="$HOME/.config/swayosd"
 FILES["color.sh"]="$HOME/.config/color.sh"
+
+# ~/.claude (Claude Code : statusline + réglages)
+FILES["statusline.sh"]="$HOME/.claude/statusline.sh"
+FILES["claude-settings.json"]="$HOME/.claude/settings.json"
+
+# ~/.local/share
+FILES["wallpapers"]="$HOME/.local/share/wallpapers"
 
 # /etc
 FILES["environment"]="/etc/environment"
@@ -25,6 +33,7 @@ FILES["sddm.conf.d"]="/etc/sddm.conf.d"
 FILES["HOMOARAK.TTF"]="/usr/share/fonts/HOMOARAK.TTF"
 FILES["sddm_spiderman"]="/usr/share/sddm/themes/sddm_spiderman"
 FILES["minimal-video"]="/usr/share/sddm/themes/minimal-video"
+FILES["sddm_surfer"]="/usr/share/sddm/themes/sddm_surfer"
 FILES["backgrounds"]="/usr/share/backgrounds"
 FILES["tlp"]="/usr/share/tlp"
 

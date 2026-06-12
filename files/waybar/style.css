@@ -2,7 +2,6 @@
 @import "clock.css";
 @import "network.css";
 @import "power.css";
-@import "pulseaudio.css";
 @import "sys.css";
 @import "workspaces.css";
 
@@ -36,6 +35,10 @@ tooltip label {
 #custom-sys,
 #battery {
   color: @first;
+}
+
+#battery {
+  font-family: "Homoarakhn", monospace;
 }
 
 #custom-power {

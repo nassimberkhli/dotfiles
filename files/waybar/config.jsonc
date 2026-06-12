@@ -5,8 +5,8 @@
   "tray": { "icon-size": 12, "spacing": 4 },
 
   "modules-left": ["clock", "battery"],
-  "modules-center": ["custom/sys", "hyprland/workspaces", "network"],
-  "modules-right": ["pulseaudio/slider", "custom/power"],
+  "modules-center": ["hyprland/workspaces"],
+  "modules-right": ["custom/sys", "network", "custom/power"],
 
   "clock": {
     "interval": 5,
@@ -24,18 +24,12 @@
     }
   },
 
-  "pulseaudio/slider": {
-    "min": 0,
-    "max": 100,
-    "orientation": "horizontal"
-  },
-
   "custom/power": {
     "exec": "printf '{\"text\":\"\",\"tooltip\":\"power option\"}'",
     "return-type": "json",
     "format": "{}",
     "tooltip": true,
-    "on-click": "kitty -e shutdown now",
+    "on-click": "~/.config/waybar/scripts/powermenu.sh",
     "interval": "once"
   },
 
@@ -79,7 +73,7 @@
 
   "battery": {
     "interval": 5,
-    "format": "{icon}",
+    "format": "-{capacity}-",
     "format-icons": [
       "󰁺",
       "󰁻",
@@ -92,9 +86,32 @@
       "󰂂",
       "󰁹"
     ],
-    "format-charging": "󰂄",
-    "format-plugged": "󰂄",
-    "format-full": "󰁹",
+    "format-charging": "^{capacity}^",
+    "format-plugged": "",
+    "format-full": "",
     "tooltip": true
   }
+
+  /*
+  "battery": {
+    "interval": 5,
+    "format": "{capacity} {icon}",
+    "format-icons": [
+      "󰁺",
+      "󰁻",
+      "󰁼",
+      "󰁽",
+      "󰁾",
+      "󰁿",
+      "󰂀",
+      "󰂁",
+      "󰂂",
+      "󰁹"
+    ],
+    "format-charging": "󰂄 {capacity}%",
+    "format-plugged": "󰂄 {capacity}%",
+    "format-full": "󰁹 {capacity}%",
+    "tooltip": true
+  }
+  */
 }

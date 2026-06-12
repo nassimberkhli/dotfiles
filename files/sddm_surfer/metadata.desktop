@@ -1,0 +1,11 @@
+[SddmGreeterTheme]
+Name=Surfer Minimal
+Description=Minimal left-aligned SDDM video theme
+Author=Nassim
+License=MIT
+Version=1.0.0
+MainScript=Main.qml
+ConfigFile=theme.conf
+Theme-Id=surfer-minimal
+Theme-API=2.2
+QtVersion=6

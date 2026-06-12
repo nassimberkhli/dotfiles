@@ -3,7 +3,7 @@
     bg:      #000000;
     bg-alt:  #0a0a0a;
     fg:      #ffffff;
-    accent:  #0000ff;
+    accent:  #ffffff;
     accent2: #00ffaa;
     warn:    #aaff00;
     urgent:  #ff2e88;

@@ -83,7 +83,6 @@ color_nvim() {
 }
 
 # ── Fish ────────────────────────────────────────────────────────────────
-# ── Fish ────────────────────────────────────────────────────────────────
 color_fish() {
     local theme="$CONF_DIR/fish/conf.d/fish_frozen_theme.fish"
     local prompt="$CONF_DIR/fish/functions/fish_prompt.fish"
@@ -105,11 +104,11 @@ color_fish() {
     _sed "s|set --global fish_color_redirection .*|set --global fish_color_redirection $c6|" "$theme"
     _sed "s|set --global fish_color_status .*|set --global fish_color_status $c5|" "$theme"
 
-    # Prompt : deux couleurs distinctes, ancrées par commentaire
-    # '# folder' = couleur du chemin pwd
-    # '# spider' = couleur de l'araignée 🕷
-    _sed "s|set_color [0-9A-Fa-f]\{6\} # folder|set_color $c2 # folder|" "$prompt"
-    _sed "s|set_color [0-9A-Fa-f]\{6\} # spider|set_color $c6 # spider|" "$prompt"
+    # Prompt (deux lignes) : ancres par commentaire
+    # '# p-user'  = [user@host]    '# p-path' = [path]    '# p-arrow' = « > »
+    _sed "s|set_color --bold [0-9A-Fa-f]\{3,6\} # p-path|set_color --bold $c1 # p-path|" "$prompt"
+    _sed "s|set_color --bold [0-9A-Fa-f]\{3,6\} # p-user|set_color --bold $c3 # p-user|" "$prompt"
+    _sed "s|set_color --bold [0-9A-Fa-f]\{3,6\} # p-arrow|set_color --bold $c2 # p-arrow|" "$prompt"
 
     # Couleurs ls / eza
     # di = directories
@@ -157,7 +156,7 @@ color_rofi() {
     local f="$CONF_DIR/rofi/colors.rasi"
     _sed "s|bg:.*|bg:      $COLOR_BG;|" "$f"
     _sed "s|fg:.*|fg:      $COLOR_1;|" "$f"
-    _sed "s|accent:.*|accent:  $COLOR_2;|" "$f"
+    _sed "s|accent:.*|accent:  $COLOR_1;|" "$f"
     _sed "s|accent2:.*|accent2: $COLOR_4;|" "$f"
     _sed "s|warn:.*|warn:    $COLOR_3;|" "$f"
     _sed "s|urgent:.*|urgent:  $COLOR_5;|" "$f"
@@ -174,7 +173,7 @@ color_dunst() {
     awk \
         -v bg="$COLOR_BG" \
         -v low_fg="$COLOR_3" -v low_fr="$COLOR_4" \
-        -v nor_fg="$COLOR_1" -v nor_fr="$COLOR_2" \
+        -v nor_fg="$COLOR_1" -v nor_fr="$COLOR_1" \
         -v cri_fg="$COLOR_1" -v cri_fr="$COLOR_5" '
         /^\[/ { sec=$0 }
         {
@@ -198,24 +197,84 @@ color_dunst() {
 }
 
 # ── SDDM (écran de connexion) ───────────────────────────────────────────
-# Le theme.conf vit dans /usr/share (appartient à root) -> écriture via sudo.
-# On ne touche QU'AUX couleurs (foreground=COLOR_1, accent=COLOR_2),
-# pas au fond (clé 'background' laissée intacte = choix manuel).
+# Le theme.conf vit dans /usr/share (root) -> écriture via sudo. Le thème
+# actif est lu via la clé Current= de /etc/sddm.conf. On ne patche que les
+# 5 couleurs + 5 polices de la table ; le fond ('background') reste intact.
 color_sddm() {
-    local f="/usr/share/sddm/themes/minimal-video/theme.conf"
-    if [ ! -e "$f" ]; then
-        echo "  ⚠ SDDM ignoré (thème minimal-video non installé) : $f" >&2
+    local theme
+    theme="$(awk -F= '/^Current=/{gsub(/[[:space:]\r]/,"",$2); print $2}' /etc/sddm.conf 2>/dev/null | head -1)"
+    [ -z "$theme" ] && theme="sddm_surfer"
+    local f="/usr/share/sddm/themes/$theme/theme.conf"
+    [ -e "$f" ] || {
+        echo "  ⚠ SDDM ignoré (theme.conf introuvable) : $f" >&2
         return 0
-    fi
-    if sudo sed -i \
-        -e "s|^foreground=.*|foreground=$COLOR_1|" \
-        -e "s|^accent=.*|accent=$COLOR_2|" \
-        "$f" 2>/dev/null; then
-        echo "  ✓ SDDM (minimal-video) : foreground=$COLOR_1, accent=$COLOR_2"
+    }
+
+    # ── Table à éditer : 1 ligne par élément = sa couleur + sa police ───────
+    local -A SDDM=(
+        [timeColor]="$COLOR_1" [timeFont]="Homoarakhn"        # l'heure
+        [userColor]="$COLOR_1" [userFont]="Homoarakhn"        # nom user + session
+        [passwordColor]="$COLOR_1" [passwordFont]="monospace" # mot de passe
+        [errorColor]="$COLOR_5" [errorFont]="Homoarakhn"      # message d'erreur
+        [fxColor]="$COLOR_1" [fxFont]="monospace"             # boutons F1/F2
+        # gradient de la barre mot de passe (min -> milieu -> max)
+        [barColorMin]="$COLOR_1" [barColorMid]="$COLOR_1" [barColorMax]="$COLOR_1"
+    )
+
+    # Construit les arguments sed depuis la table (aucune ligne sed à la main).
+    local args=() k
+    for k in "${!SDDM[@]}"; do
+        args+=(-e "s|^$k=.*|$k=${SDDM[$k]}|")
+    done
+
+    if sudo sed -i "${args[@]}" "$f" 2>/dev/null; then
+        echo "  ✓ SDDM ($theme) : 5 couleurs + 5 polices appliquées"
     else
         echo "  ⚠ SDDM non mis à jour (sudo requis / refusé)" >&2
     fi
     return 0
+}
+
+# ── SwayOSD (OSD volume centré) ──────────────────────────────────────────
+# Gradient min -> max (color_2 → color_4 → color_3) + contour/texte palette.
+color_swayosd() {
+    local f="$CONF_DIR/swayosd/style.css"
+    _sed "s|border: 2px solid #[0-9A-Fa-f]*;|border: 2px solid $COLOR_4;|" "$f"
+    _sed "s|color: #[0-9A-Fa-f]\{6\};|color: $COLOR_1;|" "$f"
+    _sed "s|background: linear-gradient(to right,[^;]*;|background: linear-gradient(to right, $COLOR_4, $COLOR_4, $COLOR_4);|" "$f"
+}
+
+# ── OSD « barres FNAF » (volume + luminosité) ───────────────────────────
+# Fichier KEY=#hex relu à chaque affichage par bar-osd-daemon.py.
+#   off  : barre éteinte (gris foncé fixe)
+#   low/mid/high : barres allumées selon le pourcentage (1-35 / 36-65 / 66-100)
+color_barosd() {
+    local f="$CONF_DIR/hypr/scripts/bar-osd.colors"
+    [ -d "$(dirname "$f")" ] || return 0
+    cat >"$f" <<EOF
+# Couleurs de l'OSD à barres — généré par color.sh (color_barosd).
+# off  = barre éteinte (gris foncé)   low/mid/high = barres allumées par seuil
+off=#3a3a3a
+low=$COLOR_2
+mid=$COLOR_3
+high=$COLOR_6
+fg=$COLOR_1
+bg=$COLOR_BG
+border=$COLOR_4
+EOF
+}
+
+# ── Statusline Claude Code ──────────────────────────────────────────────
+# Patche les variables C_* du script statusline.sh (valeur entre guillemets,
+# commentaire préservé). Le contexte garde ses 3 seuils : color_4/6/5.
+color_claude() {
+    local f="$HOME/.claude/statusline.sh"
+    [ -f "$f" ] || return 0
+    _sed "s|^C_TEXT=\"[^\"]*\"|C_TEXT=\"$COLOR_1\"|" "$f"
+    _sed "s|^C_ACCENT=\"[^\"]*\"|C_ACCENT=\"$COLOR_3\"|" "$f"
+    _sed "s|^C_CTX_LOW=\"[^\"]*\"|C_CTX_LOW=\"$COLOR_4\"|" "$f"
+    _sed "s|^C_CTX_MID=\"[^\"]*\"|C_CTX_MID=\"$COLOR_6\"|" "$f"
+    _sed "s|^C_CTX_HIGH=\"[^\"]*\"|C_CTX_HIGH=\"$COLOR_5\"|" "$f"
 }
 
 # ── Application ─────────────────────────────────────────────────────────
@@ -227,6 +286,9 @@ color_kitty
 color_rofi
 color_dunst
 color_sddm
+color_swayosd
+color_barosd
+color_claude
 
 # ── Rechargement à chaud (silencieux si l'appli n'est pas lancée) ───────
 # NB: la syntaxe du signal pour pkill est -USR2 / -USR1 (PAS -SIGUSR2).

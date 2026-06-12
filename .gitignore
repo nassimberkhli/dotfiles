@@ -1,6 +1,7 @@
 # Secrets — ne JAMAIS committer (tokens, clés…)
 files/fish/conf.d/secret_env.fish
 *secret*
+.claude
 
 # Gros fichiers vidéo de fond
 file_to_copy/Wallpapers/*.mov

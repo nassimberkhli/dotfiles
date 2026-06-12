@@ -31,7 +31,7 @@ if status is-interactive
     alias cppa "cat ~/Desktop/prompt/paths.txt | wl-copy"
     alias cppl "cat ~/Desktop/prompt/plan.txt | wl-copy"
 
-    # Alias
+    # Raccourci
     alias light "brightnessctl -d amdgpu_bl1 set"
     alias nv "nvim"
     alias rundb "pgcli -h 127.0.0.1 -p 5432 -U nassinux -d"
@@ -41,6 +41,10 @@ if status is-interactive
     alias pb 'playerctl position 20-'
     alias chess 'chess-tui -l $LICHESS_TOKEN'
     alias color "~/.config/color.sh"
+    alias ccs 'claude --dangerously-skip-permissions --model claude-sonnet-4.6'
+    alias cco 'claude --dangerously-skip-permissions --model claude-opus-4-6'
+    alias cch 'claude --dangerously-skip-permissions --model claude-haiku-4.5'
+    alias ccf 'claude --dangerously-skip-permissions --model claude-fable-5'
 
     cd ~/Desktop/projects
 end

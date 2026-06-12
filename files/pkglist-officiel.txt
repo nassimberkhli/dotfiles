@@ -58,6 +58,7 @@ linux-headers
 lsof
 lutris
 mokutil
+mpv-mpris
 ncdu
 neovim
 network-manager-applet
@@ -100,6 +101,7 @@ slurp
 sof-firmware
 sway
 swaylock
+swayosd
 synfigstudio
 thunar
 tlp
@@ -126,5 +128,6 @@ xclip
 xdg-desktop-portal-hyprland
 xorg-xcursorgen
 xorg-xrandr
+yt-dlp
 zip
 zram-generator

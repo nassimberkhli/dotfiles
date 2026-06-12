@@ -1,0 +1,47 @@
+/* ──────────────────────────────────────────────────────────────────────
+ *  SwayOSD — OSD volume / luminosité centré à l'écran.
+ *  Les couleurs sont pilotées par color.sh (fonction color_swayosd) :
+ *    - contour          -> color_4
+ *    - icône + texte %  -> color_1
+ *    - gradient barre   -> color_2 (min) → color_4 → color_3 (max)
+ * ────────────────────────────────────────────────────────────────────── */
+
+window {
+    background-color: rgba(0, 0, 0, 0.88);
+    border-radius: 20px;
+    border: 2px solid #00ffaa;
+    padding: 10px;
+}
+
+#container {
+    margin: 16px 22px;
+    min-width: 440px;
+}
+
+image {
+    color: #ffffff;
+    -gtk-icon-size: 34px;
+}
+
+label {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+progressbar {
+    min-height: 16px;
+}
+
+trough {
+    background-color: rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    min-height: 16px;
+}
+
+progress {
+    border-radius: 999px;
+    min-height: 16px;
+    /* gradient min -> max (patché par color.sh) */
+    background: linear-gradient(to right, #00ffaa, #00ffaa, #00ffaa);
+}
