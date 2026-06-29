@@ -5,6 +5,6 @@
     fg:      #ffffff;
     accent:  #ffffff;
     accent2: #00ffaa;
-    warn:    #aaff00;
+    warn:    #cdca00;
     urgent:  #ff2e88;
 }

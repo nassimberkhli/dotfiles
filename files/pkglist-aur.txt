@@ -1,12 +1,14 @@
 antigravity
 antigravity-bin
 bridge-utils
+caelestia-shell
 dynamips
 envycontrol
 gns3-gui
 gns3-server
 mpvpaper-git
 obscura-browser
+otf-bebas-neue-git
 schemaspy
 snapd
 stockfish
@@ -14,4 +16,3 @@ swaylock-plugin
 ubridge
 visual-studio-code-bin
 yay
-yay-debug

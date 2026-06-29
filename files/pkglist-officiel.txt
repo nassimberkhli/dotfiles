@@ -45,7 +45,9 @@ inetutils
 iptables
 iwd
 jq
+kdenlive
 kitty
+kooha
 less
 lib32-gnutls
 lib32-nvidia-utils

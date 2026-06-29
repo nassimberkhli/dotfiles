@@ -1,5 +1,7 @@
 @import "colors.css";
 @import "clock.css";
+@import "battery.css";
+@import "cava.css";
 @import "network.css";
 @import "power.css";
 @import "sys.css";
@@ -33,12 +35,9 @@ tooltip label {
 
 #network,
 #custom-sys,
+#custom-cava,
 #battery {
   color: @first;
-}
-
-#battery {
-  font-family: "Homoarakhn", monospace;
 }
 
 #custom-power {
@@ -47,8 +46,7 @@ tooltip label {
 
 #network,
 #custom-sys,
-#custom-power,
-#battery {
+#custom-power {
   font-size: 17px;
   margin: 0 20px;
   padding: 0 11px;

@@ -16,9 +16,9 @@ input=$(cat)
 
 # Palette (hex patchés par color.sh)
 C_TEXT="#ffffff"     # libellés ctx / reset   (color_1)
-C_ACCENT="#aaff00"   # [user@session path]    (color_3)
+C_ACCENT="#cdca00"   # [user@session path]    (color_3)
 C_CTX_LOW="#00ffaa"  # contexte < 30 %        (color_4)
-C_CTX_MID="#cdca00"  # contexte < 70 %        (color_6)
+C_CTX_MID="#16b800"  # contexte < 70 %        (color_6)
 C_CTX_HIGH="#ff2e88" # contexte < 100 %       (color_5)
 C_DIM="#5a5a5a"      # séparateurs | et reset
 

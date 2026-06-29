@@ -31,12 +31,15 @@ osd() {
 # donc playerctl et ce menu peuvent ensuite la contrôler (play/pause, suivant…).
 SOCK="${XDG_RUNTIME_DIR:-/tmp}/player-menu-mpv.sock"
 play_url() {
-    command -v mpv >/dev/null || { notify-send "player-menu" "mpv n'est pas installé"; return; }
-    command -v yt-dlp >/dev/null || \
+    command -v mpv >/dev/null || {
+        notify-send "player-menu" "mpv n'est pas installé"
+        return
+    }
+    command -v yt-dlp >/dev/null ||
         notify-send "player-menu" "yt-dlp manquant : sudo pacman -S yt-dlp mpv-mpris"
     local url mpris
     url=$(printf '' | rofi -dmenu -p "URL / playlist" \
-            -mesg "YouTube, SoundCloud, fichier… (audio, sans navigateur)")
+        -mesg "YouTube, SoundCloud, fichier… (audio, sans navigateur)")
     [ -z "$url" ] && return
     # mpv-mpris est auto-chargé depuis /etc/mpv/scripts/ → pas besoin de --script.
     # Remplace une éventuelle lecture précédente lancée depuis ce menu.
@@ -58,17 +61,17 @@ while true; do
         "⏮  Précédent" \
         "⏹  Stop" \
         "⇄  Shuffle" \
-        "⊕  Lire une URL / playlist (mpv)" \
-        | rofi -dmenu -i -no-case-sensitive -normalize-match \
-               -p "♪ $status" -mesg "$title" -no-custom)
+        "⊕  Lire une URL / playlist (mpv)" |
+        rofi -dmenu -i -no-case-sensitive -normalize-match \
+            -p "♪ $status" -mesg "$title" -no-custom)
 
     case "$choice" in
-        "⏯  Play / Pause") osd play-pause ;;
-        "⏭  Suivant")      osd next ;;
-        "⏮  Précédent")    osd prev ;;
-        "⏹  Stop")         osd stop ;;
-        "⇄  Shuffle")      osd shuffle ;;
-        "⊕  Lire une URL / playlist (mpv)") play_url ;;
-        *)                 exit 0 ;;   # Esc
+    "⏯  Play / Pause") osd play-pause ;;
+    "⏭  Suivant") osd next ;;
+    "⏮  Précédent") osd prev ;;
+    "⏹  Stop") osd stop ;;
+    "⇄  Shuffle") osd shuffle ;;
+    "⊕  Lire une URL / playlist (mpv)") play_url ;;
+    *) exit 0 ;; # Esc
     esac
 done

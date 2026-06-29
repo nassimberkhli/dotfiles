@@ -11,10 +11,10 @@
 set --global fish_color_autosuggestion brblack
 set --global fish_color_cancel -r
 set --global fish_color_command --bold ffffff
-set --global fish_color_comment cdca00
+set --global fish_color_comment 16b800
 set --global fish_color_cwd 0000ff
 set --global fish_color_cwd_root red
-set --global fish_color_end aaff00
+set --global fish_color_end cdca00
 set --global fish_color_error ff2e88
 set --global fish_color_escape brcyan
 set --global fish_color_history_current --bold
@@ -23,8 +23,8 @@ set --global fish_color_host_remote yellow
 set --global fish_color_normal normal
 set --global fish_color_operator brcyan
 set --global fish_color_param 00ffaa
-set --global fish_color_quote cdca00
-set --global fish_color_redirection cdca00
+set --global fish_color_quote 16b800
+set --global fish_color_redirection 16b800
 set --global fish_color_search_match white --background=brblack --bold
 set --global fish_color_selection white --background=brblack --bold
 set --global fish_color_status ff2e88

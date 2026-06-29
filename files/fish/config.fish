@@ -1,6 +1,7 @@
 if status is-interactive
     # Init
-    # ~/Desktop/scripts/init.sh
+    ~/Desktop/scripts/init.sh
+    #   ~/.config/waybar/scripts/cava.sh
 
     # Variable
     set -gx MONITOR "$(hyprctl monitors -j | jq -r '.[0].name')" 
@@ -32,6 +33,7 @@ if status is-interactive
     alias cppl "cat ~/Desktop/prompt/plan.txt | wl-copy"
 
     # Raccourci
+    alias ff "firefox"
     alias light "brightnessctl -d amdgpu_bl1 set"
     alias nv "nvim"
     alias rundb "pgcli -h 127.0.0.1 -p 5432 -U nassinux -d"

@@ -13,12 +13,12 @@ COLOR_BG="#000000" # fond noir (rofi, dunst, kitty)
 COLOR_1="#ffffff"  # vert phosphore — texte/premier plan (waybar:first, fish:end, kitty:fg)
 COLOR_2="#0000ff"  # cyan — accent principal (waybar:second, cava:grad1,
 #   fish:command, kitty:selection, rofi:accent, dunst:normal)
-COLOR_3="#aaff00" # lime — secondaire (waybar:third, fish:prompt 🕷,
+COLOR_3="#cdca00" # lime — secondaire (waybar:third, fish:prompt 🕷,
 #   nvim:accent2, rofi:warn, dunst:low fg)
 COLOR_4="#00ffaa" # vert-cyan — accent 2 (nvim:accent, fish:param/folder,
 #   kitty:cursor, rofi:accent2, dunst:low frame)
 COLOR_5="#ff2e88" # magenta — alerte (cava:grad2, fish:error, rofi/dunst:urgent)
-COLOR_6="#cdca00" # divers fish (comment, cwd, quote…) — vert sombre
+COLOR_6="#16b800" # divers fish (comment, cwd, quote…) — vert sombre
 COLOR_7="#fc6603"
 
 # ── Dossier de configuration (robuste, pas de ~ non étendu) ─────────────

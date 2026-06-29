@@ -1,0 +1,9 @@
+#battery {
+  font-family: "Homoarakhn", monospace;
+  font-size: 17px;
+  margin-right: 20px;
+  padding: 0 11px;
+  background: transparent;
+  border-radius: 999px;
+  margin-top: 10px;
+}

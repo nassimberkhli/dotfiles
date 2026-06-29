@@ -1,12 +1,12 @@
 {
-  "width": 1250,
+  "width": 1500,
   "margin-top": 5,
   "height": 32,
   "tray": { "icon-size": 12, "spacing": 4 },
 
-  "modules-left": ["clock", "battery"],
+  "modules-left": ["clock", "custom/cava"],
   "modules-center": ["hyprland/workspaces"],
-  "modules-right": ["custom/sys", "network", "custom/power"],
+  "modules-right": ["battery", "custom/sys", "network", "custom/power"],
 
   "clock": {
     "interval": 5,
@@ -86,11 +86,16 @@
       "󰂂",
       "󰁹"
     ],
-    "format-charging": "^{capacity}^",
+    "format-charging": "{capacity}^",
     "format-plugged": "",
-    "format-full": "",
+    "format-full": "{capacity}",
     "tooltip": true
-  }
+  },
+
+    "custom/cava": {
+        "format": "{}",
+        "exec": "~/.config/waybar/scripts/cava.sh"
+    }
 
   /*
   "battery": {

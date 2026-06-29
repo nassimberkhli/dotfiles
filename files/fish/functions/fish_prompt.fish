@@ -33,7 +33,7 @@ function fish_prompt
     test $pad -lt 1; and set pad 1
 
     echo # ligne vide avant le prompt
-    set_color --bold aaff00 # p-user
+    set_color --bold cdca00 # p-user
     echo -n $left
     echo -n (string repeat -n $pad ' ')
     set_color --bold ffffff # p-path
