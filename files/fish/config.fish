@@ -1,6 +1,6 @@
 if status is-interactive
     # Init
-    ~/Desktop/scripts/init.sh
+    # ~/Desktop/scripts/init.sh
     #   ~/.config/waybar/scripts/cava.sh
 
     # Variable
