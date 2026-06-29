@@ -35,7 +35,7 @@ FILES["sddm_spiderman"]="/usr/share/sddm/themes/sddm_spiderman"
 FILES["minimal-video"]="/usr/share/sddm/themes/minimal-video"
 FILES["sddm_surfer"]="/usr/share/sddm/themes/sddm_surfer"
 FILES["backgrounds"]="/usr/share/backgrounds"
-FILES["tlp"]="/usr/share/tlp"
+FILES["tlp.conf"]="/etc/tlp.conf"
 
 get_dest() {
     local key="$1"

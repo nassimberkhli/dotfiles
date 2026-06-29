@@ -1,6 +1,6 @@
 if status is-interactive
     # Init
-    ~/Desktop/scripts/init.sh
+    # ~/Desktop/scripts/init.sh
 
     # Variable
     set -gx MONITOR "$(hyprctl monitors -j | jq -r '.[0].name')" 
