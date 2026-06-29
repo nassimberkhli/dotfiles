@@ -6,7 +6,7 @@
 
   "modules-left": ["clock", "custom/cava"],
   "modules-center": ["hyprland/workspaces"],
-  "modules-right": ["battery", "custom/sys", "network", "custom/power"],
+  "modules-right": ["battery", "custom/coloreditor", "custom/sys", "network", "custom/power"],
 
   "clock": {
     "interval": 5,
@@ -43,6 +43,7 @@
   },
 
   "network": {
+    "interface": "wlan*",
     "format-wifi": "{icon}",
     "format-ethernet": "",
     "format-disconnected": "󰖪",
@@ -87,15 +88,24 @@
       "󰁹"
     ],
     "format-charging": "{capacity}^",
-    "format-plugged": "",
+    "format-plugged": "--",
     "format-full": "{capacity}",
     "tooltip": true
   },
 
-    "custom/cava": {
-        "format": "{}",
-        "exec": "~/.config/waybar/scripts/cava.sh"
-    }
+  "custom/cava": {
+    "format": "{text}",
+    "exec": "bash -lc '~/.config/waybar/scripts/cava.sh'",
+    "restart-interval": 1,
+    "tooltip": false
+  },
+
+  "custom/coloreditor": {
+    "format": "󰏘",
+    "tooltip": false,
+    "on-click": "kitty --class waybar-coloreditor --title 'Éditeur de couleurs' -e python ~/.config/waybar/scripts/coloreditor.py",
+    "interval": "once"
+  }
 
   /*
   "battery": {

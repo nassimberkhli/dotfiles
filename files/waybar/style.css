@@ -36,6 +36,7 @@ tooltip label {
 #network,
 #custom-sys,
 #custom-cava,
+#custom-coloreditor,
 #battery {
   color: @first;
 }
@@ -46,6 +47,7 @@ tooltip label {
 
 #network,
 #custom-sys,
+#custom-coloreditor,
 #custom-power {
   font-size: 17px;
   margin: 0 20px;

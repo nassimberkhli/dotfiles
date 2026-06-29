@@ -1,29 +1,48 @@
-#! /bin/bash
+#!/usr/bin/env bash
 
-bar="▁▂▃▄▅▆▇█"
-dict="s/;//g;"
-
-# creating "dictionary" to replace char with bar
-i=0
-while [ $i -lt ${#bar} ]; do
-    dict="${dict}s/$i/${bar:$i:1}/g;"
-    i=$((i = i + 1))
+# Wait for PipeWire/PulseAudio to be ready at boot (up to 30 s)
+for _i in $(seq 1 30); do
+    pactl info >/dev/null 2>&1 && break
+    sleep 1
 done
 
-# write cava config
-config_file="/tmp/polybar_cava_config"
-echo "
+config_file="${XDG_RUNTIME_DIR:-/tmp}/waybar_cava_config"
+
+cat >"$config_file" <<EOF
 [general]
-bars = 18
+bars = 5
+framerate = 30
+autosens = 1
+
+[input]
+channels = mono
 
 [output]
 method = raw
 raw_target = /dev/stdout
 data_format = ascii
 ascii_max_range = 7
-" >$config_file
+EOF
 
-# read stdout from cava
-cava -p $config_file | while read -r line; do
-    echo $line | sed $dict
+printf '▁▁▁▁▁\n'
+
+bars='▁▂▃▄▅▆▇█'
+
+while true; do
+    cava -p "$config_file" 2>/tmp/waybar-cava.err | python3 -c "
+import sys
+bars = '▁▂▃▄▅▆▇█'
+for line in sys.stdin:
+    line = line.strip().rstrip(';')
+    if not line:
+        continue
+    try:
+        out = ''.join(bars[int(v)] for v in line.split(';') if v.isdigit() and 0 <= int(v) <= 7)
+        if out:
+            print(out, flush=True)
+    except Exception:
+        pass
+"
+    printf '▁▁▁▁▁\n'
+    sleep 1
 done

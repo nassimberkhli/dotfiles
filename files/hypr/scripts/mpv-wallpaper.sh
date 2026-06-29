@@ -17,6 +17,12 @@ MPV_OPTS="--loop --no-audio --hwdec=auto-safe --vo=gpu --really-quiet"
 
 # Vrai si au moins une alimentation secteur (type "Mains") est branchée.
 ac_online() {
+    local has_battery=0
+    for t in /sys/class/power_supply/*/type; do
+        [ "$(cat "$t" 2>/dev/null)" = "Battery" ] && has_battery=1
+    done
+    # Tour sans batterie → toujours sur secteur → fond animé
+    [ "$has_battery" = "0" ] && return 0
     for t in /sys/class/power_supply/*/type; do
         [ "$(cat "$t" 2>/dev/null)" = "Mains" ] || continue
         [ "$(cat "${t%type}online" 2>/dev/null)" = "1" ] && return 0
