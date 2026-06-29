@@ -157,6 +157,67 @@ has_intel_gpu() {
     gpu_info | grep -qi 'intel'
 }
 
+# Machine portable ? (batterie présente OU châssis DMI de type laptop)
+system_is_laptop() {
+    if compgen -G "/sys/class/power_supply/BAT*" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    local chassis
+    chassis="$(cat /sys/class/dmi/id/chassis_type 2>/dev/null || echo 0)"
+
+    # 8=portable 9=laptop 10=notebook 11=handheld 14=sub-notebook
+    case "$chassis" in
+    8 | 9 | 10 | 11 | 14) return 0 ;;
+    esac
+
+    return 1
+}
+
+# Détecte le(s) GPU réellement présents et installe les pilotes adaptés.
+# C'est le complément de is_hardware_incompatible_package() :
+# celle-ci ÉCARTE les mauvais pilotes, celle-ci INSTALLE les bons.
+install_gpu_drivers() {
+    log "Détection du GPU et installation des pilotes adaptés"
+
+    local info
+    info="$(gpu_info)"
+
+    if [ -z "$info" ]; then
+        warn "Aucun GPU détecté (lspci absent ?), pilotes ignorés"
+        return 0
+    fi
+
+    log "GPU détecté :"
+    printf '  %s\n' "$info"
+
+    # Base commune à tous les GPU
+    local drivers=(mesa)
+
+    if has_amd_gpu; then
+        log "→ pilotes AMD (amdgpu/radeonsi)"
+        drivers+=(vulkan-radeon lib32-vulkan-radeon libva-mesa-driver mesa-vdpau)
+    fi
+
+    if has_intel_gpu; then
+        log "→ pilotes Intel"
+        drivers+=(vulkan-intel lib32-vulkan-intel intel-media-driver)
+    fi
+
+    if has_nvidia_gpu; then
+        log "→ pilotes NVIDIA"
+        # nvidia-dkms + linux-headers = indépendant du noyau (plus robuste qu'un clone)
+        drivers+=(linux-headers nvidia-dkms nvidia-utils lib32-nvidia-utils egl-wayland libva-nvidia-driver)
+        warn "NVIDIA + Hyprland : ajoute les variables d'env dans hyprland.conf si l'affichage déconne"
+        warn "  env = LIBVA_DRIVER_NAME,nvidia"
+        warn "  env = __GLX_VENDOR_LIBRARY_NAME,nvidia"
+        warn "  cursor:no_hardware_cursors = true"
+    fi
+
+    dedupe_array drivers
+    install_official_targets "${drivers[@]}"
+}
+
 is_hardware_incompatible_package() {
     local pkg="$1"
 
@@ -510,8 +571,6 @@ install_core_desktop_stack() {
         thunar
 
         sddm
-        tlp
-        tlp-rdw
 
         docker
         docker-compose
@@ -521,6 +580,14 @@ install_core_desktop_stack() {
     )
 
     install_official_targets "${packages[@]}"
+
+    # TLP : uniquement sur une machine portable (inutile sur une tour)
+    if system_is_laptop; then
+        log "Machine portable détectée → installation de TLP"
+        install_official_targets tlp tlp-rdw
+    else
+        warn "Machine fixe détectée → TLP ignoré (pas de batterie à gérer)"
+    fi
 }
 
 install_yay() {
@@ -972,6 +1039,7 @@ main() {
     full_system_upgrade
 
     install_core_desktop_stack
+    install_gpu_drivers
     install_yay
 
     install_pkglist_official
